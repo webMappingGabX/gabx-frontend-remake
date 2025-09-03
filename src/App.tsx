@@ -21,7 +21,7 @@ function App() {
     <BrowserRouter
     >
       <Routes>
-        <Route path='/auth' element={isAuthenticated ? <Navigate to={`/home`} replace /> : <AuthLayout />}>
+        <Route path='/auth' element={isAuthenticated ? <Navigate to={`/map`} replace /> : <AuthLayout />}>
           <Route path='/auth/login' element={<Login />} />
           <Route path='/auth/register' element={<Register />} />
           <Route path='/auth/forgot-password' element={<ForgotPassword />} />
@@ -32,10 +32,10 @@ function App() {
             <MainLayout />
           </AuthProtectedRoute>
         }>
-          {/* <Route path='/home' element={<Home />} /> */}
+          <Route path='/' element={ <Navigate to={`/map`} replace /> } />
           <Route path='/profile' element={<UserProfile />} />
         </Route>
-
+        
         <Route path='/map' element={
           <AuthProtectedRoute>
             <MapLayout />

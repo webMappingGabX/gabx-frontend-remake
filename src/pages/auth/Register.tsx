@@ -536,7 +536,7 @@ export default function Register() {
           <div className="mt-6 text-center">
             <span className="text-gray-600">Vous avez changer d'avis ? </span>
             <Link
-              to="/"
+              to="/map"
               className="font-medium transition-colors text-primary hover:text-primary/80"
             >
               Rentrer à la page d'accueil
