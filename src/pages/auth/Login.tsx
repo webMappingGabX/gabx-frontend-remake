@@ -86,7 +86,7 @@ export default function Login() {
     const response = await dispatch(loginUser(formData));
     
     if (response.type.includes("fulfilled")) {
-      navigate("/home");
+      navigate("/map");
     } else {
       setError(response.payload?.message  || response.payload || "Erreur lors de la connexion");
       setShowError(true);

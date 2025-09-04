@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { 
   Plus, 
   Minus, 
@@ -18,6 +18,8 @@ import { useToast } from "../../hooks/useToast";
 
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+// import { useDispatch, useSelector } from "react-redux";
+// import { selectLayers, selectSearch } from "../../app/store/slices/settingSlice";
 
 // Icônes personnalisées pour Leaflet (important pour le bon affichage)
 delete (L.Icon.Default.prototype as { _getIconUrl?: string })._getIconUrl;
@@ -63,6 +65,10 @@ const MapComponent = () => {
   const mapInstance = useRef<L.Map | null>(null); // Référence pour l'instance de carte Leaflet
   const [parcelleLayers, setParcelleLayers] = useState<L.LayerGroup | null>(null);
 
+  // const dispatch = useDispatch();
+  // const isSearchActive = useSelector(selectSearch);
+  // const isLayersActive = useSelector(selectLayers);
+
   const [parcelles] = useState<Parcelle[]>([
     {
       id: "YDE-001",
@@ -96,7 +102,9 @@ const MapComponent = () => {
   useEffect(() => {
     if (mapRef.current && !mapInstance.current) {
       // Création de l'instance de carte Leaflet
-      mapInstance.current = L.map(mapRef.current).setView(
+      mapInstance.current = L.map(mapRef.current, {
+        zoomControl: false  // Désactive les contrôles de zoom par défaut
+      }).setView(
         [viewport.center[0], viewport.center[1]], 
         viewport.zoom
       );
@@ -221,7 +229,7 @@ const MapComponent = () => {
   // Recentrer la carte sur Libreville
   const resetView = () => {
     if (mapInstance.current) {
-      mapInstance.current.setView([0.4162, 9.4456], 12);
+      mapInstance.current.setView([3.868177, 11.519596], 12);
     }
   };
 
@@ -282,9 +290,9 @@ const MapComponent = () => {
       {/* Overlay d'information de la parcelle sélectionnée */}
       {selectedParcelle && (
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 100 }}
           animate={{ opacity: 1, y: 0 }}
-          className="absolute z-[1000] max-w-sm top-4 left-4"
+          className="absolute z-[1000] max-w-sm top-14 left-4"
         >
           <Card>
             <CardContent className="p-4">
@@ -325,7 +333,7 @@ const MapComponent = () => {
       </div>
 
       {/* Barre d'outils principale */}
-      <div className="absolute z-[1000] flex flex-col gap-2 top-4 right-4">
+      <div className="absolute z-[1000] flex flex-col gap-2 top-14 right-4">
         <Button onClick={toggleFullscreen} size="icon" variant="outline">
           <Fullscreen className="w-4 h-4" />
         </Button>
@@ -335,27 +343,35 @@ const MapComponent = () => {
       </div>
 
       {/* Barre de recherche */}
-      <div className="absolute z-[1000] transform -translate-x-1/2 top-4 left-1/2 w-80">
-        <form onSubmit={handleSearch} className="flex gap-2">
-          <Input
-            placeholder="Rechercher une parcelle..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="bg-white/90 dark:bg-slate-800/90"
-          />
-          <Button type="submit" size="icon">
-            <Search className="w-4 h-4" />
-          </Button>
-        </form>
-      </div>
+      {/* <AnimatePresence>
+        {isSearchActive && (
+          <motion.div 
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: "auto", opacity: 1 }}
+            exit={{ width: 0, opacity: 0}}
+            className="absolute z-[1000] transform -translate-x-1/2 top-4 left-1/2 w-5/6 md:w-80">
+            <form onSubmit={handleSearch} className="flex gap-2">
+              <Input
+                placeholder="Rechercher..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="bg-white/90 dark:bg-slate-800/90"
+              />
+              <Button type="submit" size="icon">
+                <Search className="w-4 h-4" />
+              </Button>
+            </form>
+          </motion.div>
+        )}
+      </AnimatePresence> */}
 
       {/* Contrôles de couches */}
-      <div className="absolute z-[1000] left-4 bottom-4">
-        <Card>
+      <div className="absolute z-[1000] left-4 bottom-24">
+        <Card className="py-1">
           <CardContent className="p-3">
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Parcelles</span>
+                <span className="mr-4 text-sm font-medium">Parcelles</span>
                 <Toggle
                   pressed={activeLayers.parcelles}
                   onPressedChange={(pressed) => setActiveLayers({...activeLayers, parcelles: pressed})}
@@ -365,7 +381,7 @@ const MapComponent = () => {
                 </Toggle>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Limites</span>
+                <span className="mr-4 text-sm font-medium">Limites</span>
                 <Toggle
                   pressed={activeLayers.limites}
                   onPressedChange={(pressed) => setActiveLayers({...activeLayers, limites: pressed})}
@@ -380,7 +396,7 @@ const MapComponent = () => {
       </div>
 
       {/* Barre d'outils secondaire */}
-      <div className="absolute z-[1000] flex gap-2 bottom-4 left-20">
+      <div className="absolute z-[1000] flex gap-2 bottom-14 left-4">
         <Button onClick={startMeasuring} variant={isMeasuring ? "default" : "outline"} size="sm">
           <Ruler className="w-4 h-4 mr-1" />
           Mesurer
@@ -392,7 +408,7 @@ const MapComponent = () => {
       </div>
 
       {/* Indicateur de coordonnées */}
-      <div className="absolute z-[1000] px-2 py-1 text-xs text-white rounded bottom-4 right-20 bg-black/70">
+      <div className="absolute z-[1000] px-2 py-1 text-xs text-white rounded bottom-5 right-20 bg-black/70">
         {viewport.center[0].toFixed(4)}, {viewport.center[1].toFixed(4)} | Zoom: {viewport.zoom}
       </div>
 

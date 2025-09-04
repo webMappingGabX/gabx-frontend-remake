@@ -16,7 +16,7 @@ import MapLayout from './components/layouts/MapLayout';
 
 function App() {
   const { isAuthenticated } = useAuth();
-
+  console.log("IS AUTH", isAuthenticated);
   return (
     <BrowserRouter
     >
@@ -32,7 +32,7 @@ function App() {
             <MainLayout />
           </AuthProtectedRoute>
         }>
-          <Route path='/' element={ <Navigate to={`/map`} replace /> } />
+          {/* <Route path='/' element={ <Navigate to={`/map`} replace /> } /> */}
           <Route path='/profile' element={<UserProfile />} />
         </Route>
         

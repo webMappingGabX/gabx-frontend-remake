@@ -17,8 +17,10 @@ const Header = () => {
 
   const handleLogout = async () => {
     try {
-      await dispatch(logoutUser());
-      navigate("/auth/login");
+      const response = await dispatch(logoutUser());
+      
+      if(response.type.includes("fulfilled"))
+        navigate("/auth/login");
     } catch (error) {
       console.error("Erreur lors de la déconnexion:", error);
     }
