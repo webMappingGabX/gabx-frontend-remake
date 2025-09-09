@@ -143,7 +143,7 @@ export default function Login() {
           transition={{ duration: 0.5, delay: 0.1 }}
           className="p-8 bg-white border border-gray-100 shadow-xl rounded-2xl"
         >
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={(e) => handleSubmit(e)} className="space-y-6">
             {/* Message d'erreur global */}
             {error && (
               <div className="p-3 mb-2 text-sm text-red-700 bg-red-100 border border-red-300 rounded">
