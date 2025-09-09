@@ -3,11 +3,20 @@ import { createSlice } from "@reduxjs/toolkit";
 export interface SettingState {
     search : boolean;
     layers : boolean;
+    menu : AvailableMenus | null;
+}
+
+export enum AvailableMenus {
+    FILE = "FILE",
+    EDIT = "EDIT",
+    VIEW = "VIEW",
+    HELP = "HELP"
 }
 
 const initialState : SettingState = {
     search : false,
-    layers : false
+    layers : false,
+    menu : null
 }
 
 const settingSlice = createSlice({
@@ -15,19 +24,26 @@ const settingSlice = createSlice({
     initialState,
     reducers: {
         toggleSearch: (state) => {
-            //state.search = !state.search;
-            state.search = true;
+            state.search = !state.search;
         },
         toggleLayers: (state) => {
-            //state.layers = !state.layers;
-            state.layers = false;
+            state.layers = !state.layers;
+        },
+        openMenu: (state, action : { payload: AvailableMenus }) => {
+            state.menu = action.payload;
+            // state.menu = state.menu === action.payload ? null : action.payload;
+        },
+        closeMenu: (state) => {
+            state.menu = null;
         }
     }
 });
 
 export const {
     toggleSearch,
-    toggleLayers
+    toggleLayers,
+    openMenu,
+    closeMenu
 } = settingSlice.actions;
 
 export default settingSlice.reducer;
@@ -35,4 +51,5 @@ export default settingSlice.reducer;
 // Selectors
 export const selectSearch = (state : { setting : SettingState }) => state.setting.search;
 export const selectLayers = (state : { setting : SettingState }) => state.setting.layers;
+export const selectMenu = (state : { setting: SettingState }) => state.setting.menu;
 

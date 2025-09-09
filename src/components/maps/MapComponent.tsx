@@ -18,8 +18,11 @@ import { useToast } from "../../hooks/useToast";
 
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-// import { useDispatch, useSelector } from "react-redux";
-// import { selectLayers, selectSearch } from "../../app/store/slices/settingSlice";
+import { useDispatch, useSelector } from "react-redux";
+import { AvailableMenus, selectLayers, selectMenu, selectSearch } from "../../app/store/slices/settingSlice";
+import FileMenu from "../menus/FileMenu";
+import { fetchPlots, selectPlots } from "../../app/store/slices/plotSlice";
+import { isFulfilled } from "@reduxjs/toolkit";
 
 // Icônes personnalisées pour Leaflet (important pour le bon affichage)
 delete (L.Icon.Default.prototype as { _getIconUrl?: string })._getIconUrl;
@@ -58,16 +61,17 @@ const MapComponent = () => {
     batiments: false,
     reseau: false
   });
-  const [isMeasuring, setIsMeasuring] = useState(false);
   const { toast } = useToast();
 
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<L.Map | null>(null); // Référence pour l'instance de carte Leaflet
   const [parcelleLayers, setParcelleLayers] = useState<L.LayerGroup | null>(null);
 
-  // const dispatch = useDispatch();
-  // const isSearchActive = useSelector(selectSearch);
-  // const isLayersActive = useSelector(selectLayers);
+  const dispatch = useDispatch();
+  const isSearchActive = useSelector(selectSearch);
+  const isLayersActive = useSelector(selectLayers);
+  const currentOpenedMenu = useSelector(selectMenu);
+  const selectedPlots = useSelector(selectPlots);
 
   const [parcelles] = useState<Parcelle[]>([
     {
@@ -139,6 +143,23 @@ const MapComponent = () => {
     };
   }, []);
   
+  useEffect(() => {
+    const fetchAndFilterPlots = async () => {
+      // Chargement des parceslles
+      const getPlotsResponses = await dispatch(fetchPlots({ search: searchQuery }));
+      console.log("GET PLOT RESPONSE", getPlotsResponses);
+      if(getPlotsResponses.type.includes("fulfilled")) {
+        console.log("FULLFILLED PLOTS");
+      }
+    }
+
+    fetchAndFilterPlots();
+  }, [searchQuery]);
+
+  useEffect(() => {
+    console.log("FILTERS PLOTS", selectedPlots);
+  }, [searchQuery]);
+
   useEffect(() => {
     if (!mapInstance.current || !parcelleLayers) return;
     
@@ -260,23 +281,6 @@ const MapComponent = () => {
     }
   };
 
-  // Simulation de dessin de mesure
-  const startMeasuring = () => {
-    setIsMeasuring(true);
-    toast({
-      title: "Mode mesure activé",
-      description: "Cliquez sur la carte pour commencer à mesurer."
-    });
-  };
-
-  // Export des données
-  const exportData = () => {
-    toast({
-      title: "Export réussi",
-      description: "Les données ont été exportées au format GeoJSON."
-    });
-  };
-
   return (
     <div className="relative w-full h-full overflow-hidden bg-slate-100 dark:bg-slate-900">
       {/* Conteneur principal de la carte Leaflet */}
@@ -343,13 +347,13 @@ const MapComponent = () => {
       </div>
 
       {/* Barre de recherche */}
-      {/* <AnimatePresence>
+      <AnimatePresence>
         {isSearchActive && (
           <motion.div 
-            initial={{ width: 0, opacity: 0 }}
-            animate={{ width: "auto", opacity: 1 }}
-            exit={{ width: 0, opacity: 0}}
-            className="absolute z-[1000] transform -translate-x-1/2 top-4 left-1/2 w-5/6 md:w-80">
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0}}
+            className="absolute z-[1000] transform -translate-x-1/2 top-4 left-1/2 md:w-80 w-5/6">
             <form onSubmit={handleSearch} className="flex gap-2">
               <Input
                 placeholder="Rechercher..."
@@ -363,61 +367,54 @@ const MapComponent = () => {
             </form>
           </motion.div>
         )}
-      </AnimatePresence> */}
+      </AnimatePresence>
 
       {/* Contrôles de couches */}
-      <div className="absolute z-[1000] left-4 bottom-24">
-        <Card className="py-1">
-          <CardContent className="p-3">
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <span className="mr-4 text-sm font-medium">Parcelles</span>
-                <Toggle
-                  pressed={activeLayers.parcelles}
-                  onPressedChange={(pressed) => setActiveLayers({...activeLayers, parcelles: pressed})}
-                  size="sm"
-                >
-                  <Layers className="w-4 h-4" />
-                </Toggle>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="mr-4 text-sm font-medium">Limites</span>
-                <Toggle
-                  pressed={activeLayers.limites}
-                  onPressedChange={(pressed) => setActiveLayers({...activeLayers, limites: pressed})}
-                  size="sm"
-                >
-                  <Layers className="w-4 h-4" />
-                </Toggle>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Barre d'outils secondaire */}
-      <div className="absolute z-[1000] flex gap-2 bottom-14 left-4">
-        <Button onClick={startMeasuring} variant={isMeasuring ? "default" : "outline"} size="sm">
-          <Ruler className="w-4 h-4 mr-1" />
-          Mesurer
-        </Button>
-        <Button onClick={exportData} variant="outline" size="sm">
-          <Download className="w-4 h-4 mr-1" />
-          Exporter
-        </Button>
-      </div>
-
+      <AnimatePresence>
+        {isLayersActive && (
+          <motion.div 
+            initial={{ opacity: 0, y: 100 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 100 }}
+            // className="absolute z-[1000] left-4 bottom-24"
+            className="absolute z-[1000] left-4 top-14"
+          >
+            <Card className="py-1">
+              <CardContent className="p-3">
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <span className="mr-4 text-sm font-medium">Parcelles</span>
+                    <Toggle
+                      pressed={activeLayers.parcelles}
+                      onPressedChange={(pressed) => setActiveLayers({...activeLayers, parcelles: pressed})}
+                      size="sm"
+                    >
+                      <Layers className="w-4 h-4" />
+                    </Toggle>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="mr-4 text-sm font-medium">Limites</span>
+                    <Toggle
+                      pressed={activeLayers.limites}
+                      onPressedChange={(pressed) => setActiveLayers({...activeLayers, limites: pressed})}
+                      size="sm"
+                    >
+                      <Layers className="w-4 h-4" />
+                    </Toggle>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
+      {/* Menu Fichier */}
+      { currentOpenedMenu === AvailableMenus.FILE ? (<FileMenu />) : null }
       {/* Indicateur de coordonnées */}
       <div className="absolute z-[1000] px-2 py-1 text-xs text-white rounded bottom-5 right-20 bg-black/70">
         {viewport.center[0].toFixed(4)}, {viewport.center[1].toFixed(4)} | Zoom: {viewport.zoom}
       </div>
-
-      {/* Mode mesure actif */}
-      {isMeasuring && (
-        <div className="absolute z-[1000] px-3 py-1 text-sm text-white transform -translate-x-1/2 bg-blue-600 rounded-full top-20 left-1/2">
-          Mode mesure actif - Cliquez pour commencer
-        </div>
-      )}
     </div>
   );
 };

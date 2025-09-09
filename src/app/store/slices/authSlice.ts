@@ -108,9 +108,10 @@ export const loginUser = createAsyncThunk(
     try {
       const response = await axios.post('/auth/login', credentials);
       localStorage.setItem("accessToken", response.data.access);
-      localStorage.setItem("refreshToken", response.data.access);
+      localStorage.setItem("refreshToken", response.data.refresh);
       return response.data;
     } catch (error: unknown) {
+      console.log("LOGIN ERROR     ", error);
       const axiosError = error as AxiosErrorResponse;
       return rejectWithValue(axiosError.response?.data?.message || 'Erreur de connexion au serveur');
     }

@@ -4,6 +4,14 @@ export function getCookie(name: string): string | null {
   return match ? decodeURIComponent(match[1]) : null;
 }
 
+export const hasToken  = () => {
+  return localStorage.getItem("accessToken") !== null;
+}
+
+export const isFullyAuthenticated = (isAuthenticated : boolean) => {
+  return isAuthenticated && localStorage.getItem("accessToken") !== null;
+}
+
 /*
 export function getCookie(name) {
     const value = `; ${document.cookie}`;

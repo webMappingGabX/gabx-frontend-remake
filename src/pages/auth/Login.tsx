@@ -31,9 +31,9 @@ export default function Login() {
   const navigate = useNavigate();
 
   // Synchronisation du loading state
-  useEffect(() => {
+  /*useEffect(() => {
     setIsLoading(login.isLoading);
-  }, [login.isLoading]);
+  }, [login.isLoading]);*/
 
   const handleChange = (e) => {
     setFormData({

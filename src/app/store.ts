@@ -6,7 +6,7 @@ import rootReducer from './store/rootReducer';
 const persistConfig = {
     key: "root",
     storage,
-    whitelist: ["auth", "user", "setting"]
+    whitelist: ["auth", "user", "setting", "plots", "housingEstates"]
     // blacklist: ["test"]
 };
 

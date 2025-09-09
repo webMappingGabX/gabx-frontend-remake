@@ -1,6 +1,6 @@
 import React, { type ReactNode } from "react";
 import { Navigate } from "react-router-dom";
-import { getCookie } from "../../utils/tools";
+import { getCookie, isFullyAuthenticated } from "../../utils/tools";
 import { useSelector } from "react-redux";
 import { selectIsAuthenticated, selectUser, type AuthState } from "../../app/store/slices/authSlice";
 
@@ -11,7 +11,7 @@ interface ExpertProtectedRouteProps {
 const ExpertProtectedRoute: React.FC<ExpertProtectedRouteProps> = ({ children }) => {
     const isAuthenticated = useSelector(selectIsAuthenticated);
     const authUser = useSelector(selectUser);
-    if (!isAuthenticated) {
+    if (!isFullyAuthenticated(isAuthenticated)) {
       return <Navigate to="/auth/login" replace />;
     }
 

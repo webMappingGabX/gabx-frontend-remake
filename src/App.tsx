@@ -13,15 +13,16 @@ import AuthProtectedRoute from './components/guards/AuthProtectedRoute';
 import useAuth from "./hooks/useAuth";
 import UserProfile from './pages/Profile';
 import MapLayout from './components/layouts/MapLayout';
+import { hasToken, isFullyAuthenticated } from './utils/tools';
 
 function App() {
   const { isAuthenticated } = useAuth();
-  console.log("IS AUTH", isAuthenticated);
+
   return (
     <BrowserRouter
     >
       <Routes>
-        <Route path='/auth' element={isAuthenticated ? <Navigate to={`/map`} replace /> : <AuthLayout />}>
+        <Route path='/auth' element={isFullyAuthenticated(isAuthenticated) && hasToken() ? <Navigate to={`/map`} replace /> : <AuthLayout />}>
           <Route path='/auth/login' element={<Login />} />
           <Route path='/auth/register' element={<Register />} />
           <Route path='/auth/forgot-password' element={<ForgotPassword />} />

@@ -1,6 +1,6 @@
 import React, { type ReactNode } from "react";
 import { Navigate } from "react-router-dom";
-import { getCookie } from "../../utils/tools";
+import { getCookie, isFullyAuthenticated } from "../../utils/tools";
 import { useSelector } from "react-redux";
 import type { AuthState } from "../../app/store/slices/authSlice";
 
@@ -12,7 +12,7 @@ const AuthProtectedRoute: React.FC<AuthProtectedRouteProps> = ({ children }) => 
     //const isAuthenticated = getCookie("authenticated");
     //const isAuthenticated = getCookie("refreshToken");
     const { isAuthenticated } = useSelector((state : { auth: AuthState }) => state.auth)
-    if (!isAuthenticated) {
+    if (!isFullyAuthenticated(isAuthenticated)) {
       return <Navigate to="/auth/login" replace />;
     }
   

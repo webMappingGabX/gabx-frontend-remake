@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { selectIsAuthenticated, logoutUser } from "../../app/store/slices/authSlice";
+import { isFullyAuthenticated } from "../../utils/tools";
 
 // Type pour le dispatch Redux Toolkit
 type AppDispatch = ReturnType<typeof useDispatch>;
@@ -61,7 +62,7 @@ const Header = () => {
         <div className="flex items-center gap-4">
 
           {/* Actions utilisateur */}
-          {!isAuthenticated ? (
+          {!isFullyAuthenticated(isAuthenticated) ? (
             <div className={`items-center gap-2 hidden md:flex`}>
               <Button variant="ghost" size="sm" className="relative hover:bg-gray-200" asChild>
                 <Link to="/auth/register">
@@ -115,7 +116,7 @@ const Header = () => {
             transition={{ duration: 0.2 }}
             className="overflow-hidden bg-transparent border-t md:hidden"
           >
-            {isAuthenticated ? (
+            {isFullyAuthenticated(isAuthenticated) ? (
               <div className="container flex flex-col gap-4 py-4">
                 <Link 
                   to="/profile"
