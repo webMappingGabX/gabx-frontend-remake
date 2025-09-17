@@ -73,7 +73,7 @@ const MapComponent = () => {
   const currentOpenedMenu = useSelector(selectMenu);
   const selectedPlots = useSelector(selectPlots);
 
-  const [parcelles] = useState<Parcelle[]>([
+  const [parcelles, setParcelles] = useState<Parcelle[]>([
     {
       id: "YDE-001",
       nom: "Parcelle Bastos",
@@ -209,6 +209,59 @@ const MapComponent = () => {
       // Ajouter à la carte
       polygon.addTo(parcelleLayers);
     });
+
+    /* selectedPlots?.forEach((plot) => {
+      // Get geometries in plot
+      plot?.geom?.geometries?.forEach((geom) => {
+        if (geom.type.toLowerCase() === "multipolygon") {
+          geom.coordinates.forEach((polygonCoords: any) => {
+            const latlngs = polygonCoords.map((ring: any) =>
+              ring.map((coord: any) => [coord[1], coord[0]])
+            );
+            const polygon = L.polygon(latlngs, multiStyle);
+            polygon.addTo(parcelleLayers);
+          });
+        } else if (geom.type.toLowerCase() === "polygon") {
+          const latlngs = geom.coordinates.map((ring: any) => ring.map((coord: any) => [coord[1], coord[0]]));
+          const polygon = L.polygon(latlngs, uniStyle);
+
+          polygon.addTo(parcelleLayers);
+        } else if (geom.type.toLowerCase() === "multilinestring") {
+            geom.coordinates.forEach((lineCoord: any) => {
+              const latlngs = lineCoord.map((coord: any) => [coord[1], coord[0]]);
+
+              const line = L.polyline(latlngs, multiStyle);
+              
+              //line.addTo(parcelleLayers);
+            });
+        } else if (geom.type.toLowerCase() === "linestring") {
+            const latlngs = geom.coordinates.forEach((coord: any) => [coord[1], coord[0]]);
+            const line = L.polyline(latlngs, multiStyle);
+            
+            //line.addTo(parcelleLayers);
+        } else if (geom.type.toLowerCase() === "multipoint") {
+          geom.coordinates.forEach((coord: any) => {
+            const latlng = [coord[1], coord[0]];
+            const marker = L.marker(latlng, { icon: L.icon({ iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png', iconSize: [25, 41], iconAnchor: [12, 41] }) });
+            
+            // marker.addTo(parcelleLayers);
+          })
+        } else if (geom.type.toLowerCase() === "point") {
+          const coord = geom.coordinates;
+          const latlng = [coord[1], coord[0]];
+          const marker = L.marker(latlng, { icon: L.icon({ iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png', iconSize: [25, 41], iconAnchor: [12, 41] }) });
+          
+          // marker.addTo(parcelleLayers);
+      } else {
+        throw new Error("Unsupported geometry type: " + geom.type);
+      }
+      });
+    });*/
+    console.log("PARCELLES     ", parcelles);
+  }, [parcelles, selectedParcelle, parcelleLayers]);
+
+  useEffect(() => {
+    const importsPlots : any[] = [];
     selectedPlots?.forEach((plot) => {
         // Get geometries in plot
         plot?.geom?.geometries?.forEach((geom) => {
@@ -217,14 +270,22 @@ const MapComponent = () => {
               const latlngs = polygonCoords.map((ring: any) =>
                 ring.map((coord: any) => [coord[1], coord[0]])
               );
-              const polygon = L.polygon(latlngs, multiStyle);
-              polygon.addTo(parcelleLayers);
+              const instance = {
+                ...plot,
+                coordinates: latlngs
+              }
+              importsPlots.push(instance);
             });
           } else if (geom.type.toLowerCase() === "polygon") {
             const latlngs = geom.coordinates.map((ring: any) => ring.map((coord: any) => [coord[1], coord[0]]));
-            const polygon = L.polygon(latlngs, uniStyle);
+            // const polygon = L.polygon(latlngs, uniStyle);
 
-            polygon.addTo(parcelleLayers);
+            const instance = {
+              ...plot,
+              coordinates: latlngs
+            }
+            
+            importsPlots.push(instance);
           } else if (geom.type.toLowerCase() === "multilinestring") {
               geom.coordinates.forEach((lineCoord: any) => {
                 const latlngs = lineCoord.map((coord: any) => [coord[1], coord[0]]);
@@ -239,24 +300,30 @@ const MapComponent = () => {
               
               //line.addTo(parcelleLayers);
           } else if (geom.type.toLowerCase() === "multipoint") {
-             geom.coordinates.forEach((coord: any) => {
+            geom.coordinates.forEach((coord: any) => {
               const latlng = [coord[1], coord[0]];
               const marker = L.marker(latlng, { icon: L.icon({ iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png', iconSize: [25, 41], iconAnchor: [12, 41] }) });
               
               // marker.addTo(parcelleLayers);
-             })
+            })
           } else if (geom.type.toLowerCase() === "point") {
             const coord = geom.coordinates;
             const latlng = [coord[1], coord[0]];
             const marker = L.marker(latlng, { icon: L.icon({ iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png', iconSize: [25, 41], iconAnchor: [12, 41] }) });
             
             // marker.addTo(parcelleLayers);
-         } else {
+        } else {
           throw new Error("Unsupported geometry type: " + geom.type);
-         }
+        }
         });
     });
-  }, [parcelles, selectedParcelle, parcelleLayers]);
+
+    setParcelles([
+      ...importsPlots
+    ])
+
+  }, [selectedPlots]);
+
   // Gestion du plein écran
   const toggleFullscreen = () => {
     if (!document.fullscreenElement && mapRef.current) {
