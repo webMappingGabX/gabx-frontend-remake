@@ -3,14 +3,15 @@ import { Card, CardContent } from "../ui/card";
 import { Button } from "../ui/button";
 import { Download, File, X, Save, Building } from "lucide-react";
 import { closeMenu } from "../../app/store/slices/settingSlice";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { useToast } from "../../hooks/useToast";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { createHousingEstate } from "../../app/store/slices/housingEstateSlice";
 import { createPlot } from "../../app/store/slices/plotSlice";
+import { getArronds, getDepts, getRegions, getTowns, selectArrondState, selectDeptState, selectRegionsState, selectTokens, selectTownsState } from "../../app/store/slices/authSlice";
 
 interface GeoJsonInformations {
     name: string;
@@ -67,6 +68,58 @@ const FileMenu = () => {
         place: '',
         buildingsType: 'COLLECTIVE'
     });
+
+    const regionsFromState = useSelector(selectRegionsState);
+    const deptsFromStates = useSelector(selectDeptState);
+    const districtsFromStates = useSelector(selectArrondState);
+    const townsFromStates = useSelector(selectTownsState);
+
+    // Use Effect
+    useEffect(() => {
+        const loadRegions = async () => {
+            try {
+            const response = await dispatch(getRegions());
+
+            console.log("LOADED REGIONS", response);
+            console.log("LOADED REGIONS FROM STATE", regionsFromState);
+            } catch (err) {
+                console.log("FAILED TO LOAD REGIONS", err);
+            }
+        }
+
+        loadRegions();
+    }, []);
+
+    useEffect(() => {
+        const loadDepts = async () => {
+            const response = await dispatch(getDepts({ "regionId": housingEstateForm.region}));
+
+            console.log("LOADED DEPTS", response);
+        }
+
+        loadDepts();
+    }, [housingEstateForm.region]);
+
+    useEffect(() => {
+        const loadArronds = async () => {
+            const response = await dispatch(getArronds({ "deptId": housingEstateForm.department }));
+
+            console.log("LOADED ARRONDS", response);
+        }
+
+        loadArronds();
+    }, [housingEstateForm.department]);
+
+    useEffect(() => {
+        const loadTowns = async () => {
+            const response = await dispatch(getTowns({ "arrondId": housingEstateForm.district }));
+
+            console.log("LOADED Towns", response);
+            console.log("LOADED Towns From state", townsFromStates);
+        }
+
+        loadTowns();
+    }, [housingEstateForm.district]);
 
     // Helper function to format file size
     const formatFileSize = (bytes: number): string => {
@@ -125,7 +178,7 @@ const FileMenu = () => {
     };
 
     // Fonction pour convertir Polygon en MultiPolygon
-    const convertToMultiPolygon = (geometry: Record<string, unknown>): Record<string, unknown> => {
+    /* const convertToMultiPolygon = (geometry: Record<string, unknown>): Record<string, unknown> => {
         if (geometry.type === 'Polygon') {
             return {
                 type: 'MultiPolygon',
@@ -136,6 +189,25 @@ const FileMenu = () => {
             return geometry;
         }
         throw new Error(`Type de géométrie non supporté: ${geometry.type}`);
+    }; */
+
+    // Fonction de conversion en GeometryCollection
+    //const convertToMultiPolygon = (geometry: Record<string, unknown>): Record<string, unknown> => {
+    //const convertToGeometryCollection = (geometry: Record<string, unknown>): Record<string, unknown> => {
+    const convertToGeometryCollection = (geometry: Record<string, unknown>): Record<string, unknown> => {
+        // Convert any geometry to a GeometryCollection
+        if (!geometry) {
+            throw new Error("Aucune géométrie fournie");
+        }
+        // If already a GeometryCollection, return as is
+        if (geometry.type === 'GeometryCollection') {
+            return geometry;
+        }
+        // Otherwise, wrap the geometry in a GeometryCollection
+        return {
+            type: 'GeometryCollection',
+            geometries: [geometry]
+        };
     };
 
     // Fonction pour extraire les données des features
@@ -150,7 +222,7 @@ const FileMenu = () => {
                 if (geometry) {
                     const featureData: FeatureData = {
                         code: (properties.code as string) || generateUniqueCode(),
-                        geom: convertToMultiPolygon(geometry as Record<string, unknown>),
+                        geom: convertToGeometryCollection(geometry as Record<string, unknown>),
                         region: (properties.region as string) || undefined,
                         city: (properties.city as string) || undefined,
                         department: (properties.department as string) || undefined,
@@ -315,6 +387,7 @@ const FileMenu = () => {
             });
 
         } catch (error) {
+            console.log("ERROR", error);
             toast({
                 title: "Erreur",
                 description: "Une erreur est survenue lors de la sauvegarde",
@@ -462,32 +535,99 @@ const FileMenu = () => {
                                                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                                                     <div className="space-y-2">
                                                         <Label>Région</Label>
-                                                        <Input
+                                                        <Select
+                                                            value={housingEstateForm.region}
+                                                            onValueChange={(value) => 
+                                                                handleHousingEstateFormChange('region', value)}
+                                                        >
+                                                            <SelectTrigger className="w-full">
+                                                                <SelectValue />
+                                                            </SelectTrigger>
+                                                            <SelectContent className="z-[1500] w-full">
+                                                                {regionsFromState?.map((region) => {
+                                                                    return (
+                                                                        <SelectItem key={region?.id} value={region?.id} >{region?.name}</SelectItem>
+                                                                    );
+                                                                })}
+                                                            </SelectContent>
+                                                        </Select>
+                                                        {/*<Input
                                                             value={housingEstateForm.region}
                                                             onChange={(e) => handleHousingEstateFormChange('region', e.target.value)}
-                                                        />
-                                                    </div>
-                                                    <div className="space-y-2">
-                                                        <Label>Ville</Label>
-                                                        <Input
-                                                            value={housingEstateForm.city}
-                                                            onChange={(e) => handleHousingEstateFormChange('city', e.target.value)}
-                                                        />
+                                                        />*/}
                                                     </div>
                                                     <div className="space-y-2">
                                                         <Label>Département</Label>
-                                                        <Input
+                                                        <Select
+                                                            value={housingEstateForm.department}
+                                                            onValueChange={(value) => 
+                                                                handleHousingEstateFormChange('department', value)}
+                                                        >
+                                                            <SelectTrigger className="w-full">
+                                                                <SelectValue />
+                                                            </SelectTrigger>
+                                                            <SelectContent className="z-[1500] w-full">
+                                                                {deptsFromStates?.map((dept) => {
+                                                                    return (
+                                                                        <SelectItem key={dept.id} value={dept?.id} >{dept?.name}</SelectItem>
+                                                                    );
+                                                                })}
+                                                            </SelectContent>
+                                                        </Select>
+                                                        {/*<Input
                                                             value={housingEstateForm.department}
                                                             onChange={(e) => handleHousingEstateFormChange('department', e.target.value)}
-                                                        />
+                                                        />*/}
                                                     </div>
+
                                                     <div className="space-y-2">
                                                         <Label>District</Label>
-                                                        <Input
+                                                        <Select
+                                                            value={housingEstateForm.district}
+                                                            onValueChange={(value) => 
+                                                                handleHousingEstateFormChange('district', value)}
+                                                        >
+                                                            <SelectTrigger className="w-full">
+                                                                <SelectValue />
+                                                            </SelectTrigger>
+                                                            <SelectContent className="z-[1500] w-full">
+                                                                {districtsFromStates?.map((district) => {
+                                                                    return (
+                                                                        <SelectItem key={district.id} value={district?.id} >{district?.name}</SelectItem>
+                                                                    );
+                                                                })}
+                                                            </SelectContent>
+                                                        </Select>
+                                                        {/*<Input
                                                             value={housingEstateForm.district}
                                                             onChange={(e) => handleHousingEstateFormChange('district', e.target.value)}
-                                                        />
+                                                        />*/}
                                                     </div>
+
+                                                    <div className="space-y-2">
+                                                        <Label>Ville</Label>
+                                                        <Select
+                                                            value={housingEstateForm.city}
+                                                            onValueChange={(value) => 
+                                                                handleHousingEstateFormChange('city', value)}
+                                                        >
+                                                            <SelectTrigger className="w-full">
+                                                                <SelectValue />
+                                                            </SelectTrigger>
+                                                            <SelectContent className="z-[1500] w-full">
+                                                                {Array.isArray(townsFromStates) && townsFromStates?.map((town) => {
+                                                                    return (
+                                                                        <SelectItem key={town?.id} value={town?.id} >{town?.name}</SelectItem>
+                                                                    );
+                                                                })}
+                                                            </SelectContent>
+                                                        </Select>
+                                                        {/*<Input
+                                                            value={housingEstateForm.city}
+                                                            onChange={(e) => handleHousingEstateFormChange('city', e.target.value)}
+                                                        />*/}
+                                                    </div>
+                                                    
                                                     <div className="space-y-2">
                                                         <Label>Lieu</Label>
                                                         <Input
@@ -505,7 +645,7 @@ const FileMenu = () => {
                                                             <SelectTrigger className="w-full">
                                                                 <SelectValue />
                                                             </SelectTrigger>
-                                                            <SelectContent className="z-[1200] w-full">
+                                                            <SelectContent className="z-[1500] w-full">
                                                                 <SelectItem value="COLLECTIVE">Collectif</SelectItem>
                                                                 <SelectItem value="INDIVIDUAL">Individuel</SelectItem>
                                                             </SelectContent>

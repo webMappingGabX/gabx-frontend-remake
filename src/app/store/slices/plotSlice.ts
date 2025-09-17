@@ -1,6 +1,11 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from "@reduxjs/toolkit";
 import axios from "../../../api/axios";
 
+// Plot Format
+/*export interface PlotFormat {
+    crs: 
+}*/
+
 // Types based on Plot model
 export interface Plot {
     id?: number;

@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "../ui/button";
-import { Menu, X, User, Map } from "lucide-react";
+import { Menu, X, User, Map, UserCog } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
@@ -84,6 +84,11 @@ const Header = () => {
           ) : (
             <div className={`items-center gap-2 hidden md:flex`}>
               <Button variant="ghost" size="icon" asChild>
+                <Link to="/admin">
+                  <UserCog className="w-5 h-5" />
+                </Link>
+              </Button>
+              <Button variant="ghost" size="icon" asChild>
                 <Link to="/profile">
                   <User className="w-5 h-5" />
                 </Link>
@@ -118,6 +123,13 @@ const Header = () => {
           >
             {isFullyAuthenticated(isAuthenticated) ? (
               <div className="container flex flex-col gap-4 py-4">
+                <Link 
+                  to="/admin"
+                  className="py-2 font-medium transition-colors hover:text-primary"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Administration
+                </Link>
                 <Link 
                   to="/profile"
                   className="py-2 font-medium transition-colors hover:text-primary"

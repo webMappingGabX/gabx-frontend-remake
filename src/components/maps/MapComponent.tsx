@@ -50,7 +50,7 @@ interface MapViewport {
 const MapComponent = () => {
   const [viewport, setViewport] = useState<MapViewport>({
     center: [3.868177, 11.519596],
-    zoom: 12
+    zoom: 16
   });
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedParcelle, setSelectedParcelle] = useState<Parcelle | null>(null);
@@ -101,6 +101,20 @@ const MapComponent = () => {
       proprietaire: "Aminatou Oumarou"
     }
   ]);
+
+  const multiStyle = {
+    color: '#f59e42',
+    weight: 2,
+    fillColor: '#f59e42',
+    fillOpacity: 0.2
+  };
+
+  const uniStyle = {
+    color: '#42F58ABE',
+    weight: 2,
+    fillColor: '#42F58ABE',
+    fillOpacity: 0.2
+  };
 
   // Initialisation de la carte Leaflet
   useEffect(() => {
@@ -194,6 +208,53 @@ const MapComponent = () => {
       
       // Ajouter à la carte
       polygon.addTo(parcelleLayers);
+    });
+    selectedPlots?.forEach((plot) => {
+        // Get geometries in plot
+        plot?.geom?.geometries?.forEach((geom) => {
+          if (geom.type.toLowerCase() === "multipolygon") {
+            geom.coordinates.forEach((polygonCoords: any) => {
+              const latlngs = polygonCoords.map((ring: any) =>
+                ring.map((coord: any) => [coord[1], coord[0]])
+              );
+              const polygon = L.polygon(latlngs, multiStyle);
+              polygon.addTo(parcelleLayers);
+            });
+          } else if (geom.type.toLowerCase() === "polygon") {
+            const latlngs = geom.coordinates.map((ring: any) => ring.map((coord: any) => [coord[1], coord[0]]));
+            const polygon = L.polygon(latlngs, uniStyle);
+
+            polygon.addTo(parcelleLayers);
+          } else if (geom.type.toLowerCase() === "multilinestring") {
+              geom.coordinates.forEach((lineCoord: any) => {
+                const latlngs = lineCoord.map((coord: any) => [coord[1], coord[0]]);
+
+                const line = L.polyline(latlngs, multiStyle);
+                
+                //line.addTo(parcelleLayers);
+              });
+          } else if (geom.type.toLowerCase() === "linestring") {
+              const latlngs = geom.coordinates.forEach((coord: any) => [coord[1], coord[0]]);
+              const line = L.polyline(latlngs, multiStyle);
+              
+              //line.addTo(parcelleLayers);
+          } else if (geom.type.toLowerCase() === "multipoint") {
+             geom.coordinates.forEach((coord: any) => {
+              const latlng = [coord[1], coord[0]];
+              const marker = L.marker(latlng, { icon: L.icon({ iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png', iconSize: [25, 41], iconAnchor: [12, 41] }) });
+              
+              // marker.addTo(parcelleLayers);
+             })
+          } else if (geom.type.toLowerCase() === "point") {
+            const coord = geom.coordinates;
+            const latlng = [coord[1], coord[0]];
+            const marker = L.marker(latlng, { icon: L.icon({ iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png', iconSize: [25, 41], iconAnchor: [12, 41] }) });
+            
+            // marker.addTo(parcelleLayers);
+         } else {
+          throw new Error("Unsupported geometry type: " + geom.type);
+         }
+        });
     });
   }, [parcelles, selectedParcelle, parcelleLayers]);
   // Gestion du plein écran

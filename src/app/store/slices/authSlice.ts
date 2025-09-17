@@ -58,6 +58,13 @@ export interface AuthState {
     error: string | null;
     success: boolean;
   };
+  
+  // États pour les données géographiques
+  regions: null;
+  depts: null;
+  arronds: null;
+  towns: null;
+
 }
 
 // État initial
@@ -66,8 +73,8 @@ const initialState: AuthState = {
   isAuthenticated: false,
   isLoading: false,
   error: null,
-  accessToken: null,
-  refreshToken: null,
+  accessToken: '',
+  refreshToken: '',
   
   login: {
     isLoading: false,
@@ -99,6 +106,12 @@ const initialState: AuthState = {
     error: null,
     success: false,
   },
+  
+  // États pour les données géographiques
+  regions: null,
+  depts: null,
+  arronds: null,
+  towns: null
 };
 
 // Actions asynchrones
@@ -194,6 +207,77 @@ export const verifyResource = createAsyncThunk(
     } catch (error: unknown) {
       const axiosError = error as AxiosErrorResponse;
       return rejectWithValue(axiosError.response?.data?.message || 'Erreur de verification des resources');
+    }
+  }
+);
+
+// Thunk for regions
+export const getRegions = createAsyncThunk(
+  'auth/getRegions',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await axios.get('/geo/regions');
+      return response.data;
+    } catch (error: unknown) {
+      console.log("GET REGIONS ERROR", error)
+      const axiosError = error as AxiosErrorResponse;
+      return rejectWithValue(axiosError.response?.data?.message || 'Erreur de la recuperation des regions');
+    }
+  }
+);
+
+// Thunk for departments
+export const getDepts = createAsyncThunk(
+  'auth/getDepts',
+  async ({ regionId, params = null }, { rejectWithValue }) => {
+    try {
+      console.log("REGION ID", regionId);
+      const response = await axios.get('/geo/departments', { params: {
+        regionId,
+        ...params
+      } });
+      return response.data;
+    } catch (error: unknown) {
+      console.log("GET DEPTS ERROR", error)
+      const axiosError = error as AxiosErrorResponse;
+      return rejectWithValue(axiosError.response?.data?.message || 'Erreur de la recuperation des depts');
+    }
+  }
+);
+
+// Thunk for districts
+export const getArronds = createAsyncThunk(
+  'auth/getArronds',
+  async ({ deptId, params = null }, { rejectWithValue }) => {
+    try {
+      const response = await axios.get('/geo/arrondissements', { params: {
+        departmentId: deptId,
+        ...params
+      } });
+      return response.data;
+    } catch (error: unknown) {
+      console.log("GET ARRONDS ERROR", error)
+      const axiosError = error as AxiosErrorResponse;
+      return rejectWithValue(axiosError.response?.data?.message || 'Erreur de la recuperation des arronds');
+    }
+  }
+);
+
+// Thunk for towns
+export const getTowns = createAsyncThunk(
+  'auth/getTowns',
+  async ({ arrondId, params = null }, { rejectWithValue }) => {
+    try {
+      console.log("ARRONDISSEMENT ID", arrondId);
+      const response = await axios.get('/geo/towns', { params: {
+        arrondissementId: arrondId,
+        ...params
+      } });
+      return response.data;
+    } catch (error: unknown) {
+      console.log("GET TOWNS ERROR", error)
+      const axiosError = error as AxiosErrorResponse;
+      return rejectWithValue(axiosError.response?.data?.message || 'Erreur de la recuperation des villes');
     }
   }
 );
@@ -381,6 +465,30 @@ const authSlice = createSlice({
         state.verifyResource.error = action.payload as string;
         state.error = action.payload as string;
       });
+
+      // Regions
+      builder
+        .addCase(getRegions.fulfilled, (state : AuthState, action) => {
+          state.regions = action.payload.data;
+        });
+
+      // Departments
+      builder
+        .addCase(getDepts.fulfilled, (state, action) => {
+          state.depts = action.payload.data;
+        });
+
+      // Arrondissements
+      builder
+        .addCase(getArronds.fulfilled, (state, action) => {
+          state.arronds = action.payload.data;
+        });
+
+      // Towns
+      builder
+        .addCase(getTowns.fulfilled, (state, action) => {
+          state.towns = action.payload.data;
+        });  
   },
 });
 
@@ -402,12 +510,17 @@ export const selectTokens = (state: { auth: AuthState }) => ({
   access: state.auth.accessToken,
   refresh: state.auth.refreshToken,
 });
-export const selectIsAuthenticated = (state: { auth: AuthState }) => state.auth.isAuthenticated;
-export const selectAuthLoading = (state: { auth: AuthState }) => state.auth.isLoading;
-export const selectAuthError = (state: { auth: AuthState }) => state.auth.error;
+export const selectIsAuthenticated = (state: { auth: AuthState }) => state.auth?.isAuthenticated;
+export const selectAuthLoading = (state: { auth: AuthState }) => state.auth?.isLoading;
+export const selectAuthError = (state: { auth: AuthState }) => state.auth?.error;
 
-export const selectLoginState = (state: { auth: AuthState }) => state.auth.login;
-export const selectRegisterState = (state: { auth: AuthState }) => state.auth.register;
-export const selectSendResetCodeState = (state: { auth: AuthState }) => state.auth.sendResetCode;
-export const selectVerifyCodeState = (state: { auth: AuthState }) => state.auth.verifyCode;
-export const selectResetPasswordState = (state: { auth: AuthState }) => state.auth.resetPassword;
+export const selectLoginState = (state: { auth: AuthState }) => state.auth?.login;
+export const selectRegisterState = (state: { auth: AuthState }) => state.auth?.register;
+export const selectSendResetCodeState = (state: { auth: AuthState }) => state.auth?.sendResetCode;
+export const selectVerifyCodeState = (state: { auth: AuthState }) => state.auth?.verifyCode;
+export const selectResetPasswordState = (state: { auth: AuthState }) => state.auth?.resetPassword;
+
+export const selectRegionsState = (state: { auth: AuthState }) => state.auth.regions;
+export const selectDeptState = (state: { auth: AuthState }) => state.auth.depts;
+export const selectArrondState = (state: { auth: AuthState }) => state.auth.arronds;
+export const selectTownsState = (state: { auth: AuthState }) => state.auth.towns;
