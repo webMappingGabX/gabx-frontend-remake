@@ -11,10 +11,10 @@ export interface Plot {
     id?: number;
     code: string;
     geom?: Record<string, unknown>; // GeoJSON geometry
-    region?: string;
-    city?: string;
-    department?: string;
-    district?: string;
+    regionId?: number;
+    departmentId?: number;
+    arrondissementId?: number;
+    townId?: number;
     place?: string;
     TFnumber?: string;
     acquiredYear?: number;
@@ -117,7 +117,7 @@ export const createPlot = createAsyncThunk(
 export const updatePlot = createAsyncThunk(
     'plots/updatePlot',
     async ({ code, updateData }: { code: string; updateData: Partial<Plot> }) => {
-        const response = await axios.put(`/plots/${code}`, updateData);
+        const response = await axios.patch(`/plots/${code}`, updateData);
         return response.data;
     }
 );

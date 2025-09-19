@@ -1,6 +1,5 @@
 import './App.css'
 import AuthLayout from './components/layouts/AuthLayout';
-import Header from './components/partials/Header'
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
@@ -8,12 +7,15 @@ import ForgotPassword from './pages/auth/ForgotPassword';
 import Forbidden from './components/errors/Forbidden';
 import NotFound from './components/errors/NotFound';
 import MainLayout from './components/layouts/MainLayout';
-import Home from './pages/Home';
 import AuthProtectedRoute from './components/guards/AuthProtectedRoute';
 import useAuth from "./hooks/useAuth";
 import UserProfile from './pages/Profile';
 import MapLayout from './components/layouts/MapLayout';
 import { hasToken, isFullyAuthenticated } from './utils/tools';
+import DashboardLayout from './components/layouts/DashboardLayout';
+import AdminUsersPage from './pages/dashboard/AdminUsersPage';
+import AdminDashboard from './pages/dashboard/AdminDashboard';
+import AdminObservations from './pages/dashboard/AdminObservations';
 
 function App() {
   const { isAuthenticated } = useAuth();
@@ -34,7 +36,19 @@ function App() {
           </AuthProtectedRoute>
         }>
           {/* <Route path='/' element={ <Navigate to={`/map`} replace /> } /> */}
+          <Route path='/admin' element={<UserProfile />} />
+          <Route path='/observations' element={<UserProfile />} />
           <Route path='/profile' element={<UserProfile />} />
+        </Route>
+
+        <Route path='/dashboard' element={
+          <AuthProtectedRoute>
+            <DashboardLayout />
+          </AuthProtectedRoute>
+        }>
+          <Route path='/dashboard' element={<AdminDashboard />} />
+          <Route path='/dashboard/users' element={<AdminUsersPage />} />
+          <Route path='/dashboard/observations' element={<AdminObservations />} />
         </Route>
         
         <Route path='/map' element={

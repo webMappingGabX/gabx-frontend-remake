@@ -15,7 +15,7 @@ export interface User {
   id: string;
   email: string;
   username?: string;
-  role: 'DEFAULT' | 'EXPERT' | 'ADMIN';
+  role: 'DEFAULT' | 'EXPERT' | 'ADMIN' | 'TENANT';
   profession: string;
 }
 
@@ -513,6 +513,7 @@ export const selectTokens = (state: { auth: AuthState }) => ({
 export const selectIsAuthenticated = (state: { auth: AuthState }) => state.auth?.isAuthenticated;
 export const selectAuthLoading = (state: { auth: AuthState }) => state.auth?.isLoading;
 export const selectAuthError = (state: { auth: AuthState }) => state.auth?.error;
+export const selectAuthUser = (state: { auth: AuthState }) => state.auth?.user;
 
 export const selectLoginState = (state: { auth: AuthState }) => state.auth?.login;
 export const selectRegisterState = (state: { auth: AuthState }) => state.auth?.register;

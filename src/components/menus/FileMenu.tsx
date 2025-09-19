@@ -26,9 +26,9 @@ interface GeoJsonInformations {
 interface HousingEstateFormData {
     name: string;
     region: string;
-    city: string;
+    town: string;
     department: string;
-    district: string;
+    arrondissement: string;
     place: string;
     buildingsType: 'COLLECTIVE' | 'INDIVIDUAL';
 }
@@ -62,9 +62,9 @@ const FileMenu = () => {
     const [housingEstateForm, setHousingEstateForm] = useState<HousingEstateFormData>({
         name: "",
         region: '',
-        city: '',
+        town: '',
         department: '',
-        district: '',
+        arrondissement: '',
         place: '',
         buildingsType: 'COLLECTIVE'
     });
@@ -223,10 +223,10 @@ const FileMenu = () => {
                     const featureData: FeatureData = {
                         code: (properties.code as string) || generateUniqueCode(),
                         geom: convertToGeometryCollection(geometry as Record<string, unknown>),
-                        region: (properties.region as string) || undefined,
-                        city: (properties.city as string) || undefined,
-                        department: (properties.department as string) || undefined,
-                        district: (properties.district as string) || undefined,
+                        regionId: (properties.regionId as string) || undefined,
+                        townId: (properties.townId as string) || undefined,
+                        departmentId: (properties.departmentId as string) || undefined,
+                        arrondissementId: (properties.arrondissementId as string) || undefined,
                         place: (properties.place as string) || undefined,
                         TFnumber: (properties.TFnumber as string) || (properties.tfnumber as string) || undefined,
                         acquiredYear: (properties.acquiredYear as number) || (properties.year as number) || undefined,
@@ -249,10 +249,10 @@ const FileMenu = () => {
                 const featureData: FeatureData = {
                     code: (properties.code as string) || generateUniqueCode(),
                     geom: convertToMultiPolygon(geometry as Record<string, unknown>),
-                    region: (properties.region as string) || undefined,
-                    city: (properties.city as string) || undefined,
-                    department: (properties.department as string) || undefined,
-                    district: (properties.district as string) || undefined,
+                    regionId: (properties.regionId as string) || undefined,
+                    townId: (properties.townId as string) || undefined,
+                    departmentId: (properties.departmentId as string) || undefined,
+                    arrondissementId: (properties.arrondissementId as string) || undefined,
                     place: (properties.place as string) || undefined,
                     TFnumber: (properties.TFnumber as string) || (properties.tfnumber as string) || undefined,
                     acquiredYear: (properties.acquiredYear as number) || (properties.year as number) || undefined,
@@ -274,7 +274,14 @@ const FileMenu = () => {
     // Fonction pour créer un housing estate via l'API
     const createHE = async (formData: HousingEstateFormData): Promise<string | null> => {
         try {
-            const response = await dispatch(createHousingEstate(formData));
+            const datas = {
+                ...formData,
+                regionId: formData.region,
+                departmentId: formData.department,
+                arrondissementId: formData.arrondissement,
+                townId: formData.town
+            }
+            const response = await dispatch(createHousingEstate(datas));
             
             if(response.type.includes("rejected"))
             {
@@ -306,9 +313,10 @@ const FileMenu = () => {
 
                 // Si un housing estate est spécifié, reporter ses attributs sur les features enfants
                 if (housingEstateId && housingEstateData) {
-                    updatedFeature.region = housingEstateData.region || feature.region;
-                    updatedFeature.department = housingEstateData.department || feature.department;
-                    updatedFeature.district = housingEstateData.district || feature.district;
+                    updatedFeature.regionId = housingEstateData.region || feature.region;
+                    updatedFeature.departmentId = housingEstateData.department || feature.department;
+                    updatedFeature.arrondissementId = housingEstateData.arrondissement || feature.district;
+                    updatedFeature.townId = housingEstateData.town || feature.district;
                     updatedFeature.place = housingEstateData.place || feature.place;
                 }
 
@@ -354,7 +362,7 @@ const FileMenu = () => {
 
             // Si le formulaire housing estate est rempli, on le crée d'abord
             if (showHousingEstateForm && 
-                (housingEstateForm.region || housingEstateForm.city || housingEstateForm.department)) {
+                (housingEstateForm.region || housingEstateForm.town || housingEstateForm.department)) {
                 
                 housingEstateId = await createHE(housingEstateForm);
                 if (!housingEstateId) {
@@ -379,9 +387,9 @@ const FileMenu = () => {
             setHousingEstateForm({
                 name: '',
                 region: '',
-                city: '',
+                town: '',
                 department: '',
-                district: '',
+                arrondissement: '',
                 place: '',
                 buildingsType: 'COLLECTIVE'
             });

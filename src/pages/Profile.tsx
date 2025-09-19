@@ -18,7 +18,12 @@ import {
   BarChart3,
   FileText,
   Settings,
-  Activity
+  Activity,
+  Lock,
+  RefreshCw,
+  Eye,
+  EyeOff,
+  Download
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -30,46 +35,52 @@ import { useToast } from "../hooks/useToast";
 import { useSelector } from "react-redux";
 import { selectUser } from "../app/store/slices/authSlice";
 
+// Types basés sur votre modèle User
+interface UserProfile {
+  id: string;
+  username: string;
+  email: string;
+  password?: string;
+  role: "DEFAULT" | "EXPERT" | "ADMIN";
+  profession: string;
+  status: "ACTIVE" | "INACTIVE" | "SUSPEND";
+  resetCode?: string;
+  resetCodeExpiresAt?: string;
+  locationCode?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 const UserProfile = () => {
   const [activeTab, setActiveTab] = useState("general");
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
 
   const authUser = useSelector(selectUser);
   
-  // Données utilisateur adaptées au projet de cartographie immobilière
-  const [userData, setUserData] = useState({
-    firstName: "Thomas",
-    lastName: "Martin",
+  // Données utilisateur adaptées à votre modèle
+  const [userData, setUserData] = useState<UserProfile>({
+    id: "1",
+    username: "thomas_martin",
     email: "thomas.martin@agence-territoriale.gab",
-    phone: "+241 01 23 45 67",
-    organization: "Agence Territoriale du Gabon",
-    position: "Géomaticien Senior",
-    avatar: "/avatars/thomas-martin.jpg",
-    role: "Expert",
-    lastLogin: "2024-01-15T14:30:00Z",
-    specialization: "Cartographie immobilière et gestion foncière",
-    region: "Libreville",
-    department: "Estuaire",
-    mapPreferences: {
-      defaultView: "satellite",
-      measurementUnit: "hectares",
-      defaultRegion: "Libreville",
-      coordinateSystem: "WGS84"
-    },
-    permissions: {
-      canCreatePlots: true,
-      canEditPlots: true,
-      canDeletePlots: false,
-      canManageUsers: false,
-      canExportData: true,
-      canGenerateReports: true
-    }
+    role: "EXPERT",
+    profession: "Géomaticien Senior",
+    status: "ACTIVE",
+    locationCode: "LBV-EST-001",
+    createdAt: "2024-01-15T10:30:00Z",
+    updatedAt: "2024-01-20T14:22:00Z"
   });
 
-  const handleInputChange = (e) => {
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: ""
+  });
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setUserData(prev => ({
       ...prev,
@@ -77,12 +88,20 @@ const UserProfile = () => {
     }));
   };
 
-  const handleAvatarChange = (e) => {
-    const file = e.target.files[0];
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setPasswordData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setAvatarPreview(reader.result);
+        setAvatarPreview(reader.result as string);
       };
       reader.readAsDataURL(file);
     }
@@ -101,9 +120,69 @@ const UserProfile = () => {
     }, 1500);
   };
 
+  const handlePasswordSave = async () => {
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      toast({
+        title: "Erreur",
+        description: "Les mots de passe ne correspondent pas.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    // Simulation de changement de mot de passe
+    setTimeout(() => {
+      setIsLoading(false);
+      setPasswordData({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: ""
+      });
+      toast({
+        title: "Mot de passe modifié",
+        description: "Votre mot de passe a été changé avec succès.",
+      });
+    }, 1500);
+  };
+
   const handleCancel = () => {
     setIsEditing(false);
     setAvatarPreview("");
+  };
+
+  const requestPasswordReset = () => {
+    toast({
+      title: "Demande envoyée",
+      description: "Un code de réinitialisation a été envoyé à votre email.",
+    });
+  };
+
+  const getStatusBadgeVariant = (status: UserProfile["status"]) => {
+    switch (status) {
+      case "ACTIVE": return "default";
+      case "INACTIVE": return "secondary";
+      case "SUSPEND": return "destructive";
+      default: return "outline";
+    }
+  };
+
+  const getRoleLabel = (role: UserProfile["role"]) => {
+    switch (role) {
+      case "ADMIN": return "Administrateur";
+      case "EXPERT": return "Expert";
+      case "DEFAULT": return "Utilisateur";
+      default: return role;
+    }
+  };
+
+  const getStatusLabel = (status: UserProfile["status"]) => {
+    switch (status) {
+      case "ACTIVE": return "Actif";
+      case "INACTIVE": return "Inactif";
+      case "SUSPEND": return "Suspendu";
+      default: return status;
+    }
   };
 
   return (
@@ -118,9 +197,9 @@ const UserProfile = () => {
           <div className="flex flex-col items-center gap-4">
             <div className="relative">
               <Avatar className="w-32 h-32 border-4 border-white shadow-lg">
-                <AvatarImage src={avatarPreview || userData.avatar} />
+                <AvatarImage src={avatarPreview || "/avatars/thomas-martin.jpg"} />
                 <AvatarFallback className="text-3xl bg-blue-100">
-                  {userData.firstName[0]}{userData.lastName[0]}
+                  {userData.username[0]?.toUpperCase()}
                 </AvatarFallback>
               </Avatar>
               
@@ -142,16 +221,23 @@ const UserProfile = () => {
             </div>
             
             <div className="text-center">
-              <h2 className="text-2xl font-bold">{userData.firstName} {userData.lastName}</h2>
-              <p className="text-gray-600">{userData.position}</p>
-              <p className="text-sm text-gray-500">{userData.organization}</p>
-              <div className="inline-flex items-center px-3 py-1 mt-2 text-sm text-blue-800 bg-blue-100 rounded-full">
-                <Shield className="w-4 h-4 mr-1" />
-                {userData.role}
-              </div>
-              <div className="inline-flex items-center px-3 py-1 mt-2 text-sm text-green-800 bg-green-100 rounded-full">
-                <MapPin className="w-4 h-4 mr-1" />
-                {userData.region}, {userData.department}
+              <h2 className="text-2xl font-bold">{userData.username}</h2>
+              <p className="text-gray-600">{userData.profession}</p>
+              <div className="flex flex-col gap-2 mt-3">
+                <div className="inline-flex items-center px-3 py-1 text-sm text-blue-800 bg-blue-100 rounded-full">
+                  <Shield className="w-4 h-4 mr-1" />
+                  {getRoleLabel(userData.role)}
+                </div>
+                <div className="inline-flex items-center px-3 py-1 text-sm text-green-800 bg-green-100 rounded-full">
+                  <Activity className="w-4 h-4 mr-1" />
+                  {getStatusLabel(userData.status)}
+                </div>
+                {userData.locationCode && (
+                  <div className="inline-flex items-center px-3 py-1 text-sm text-purple-800 bg-purple-100 rounded-full">
+                    <MapPin className="w-4 h-4 mr-1" />
+                    {userData.locationCode}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -187,8 +273,8 @@ const UserProfile = () => {
             )}
             
             <div className="text-sm text-gray-500">
-              <p>Membre depuis: Janvier 2024</p>
-              <p>Dernière connexion: {new Date(userData.lastLogin).toLocaleDateString('fr-FR')}</p>
+              <p>Membre depuis: {new Date(userData.createdAt).toLocaleDateString('fr-FR')}</p>
+              <p>Dernière modification: {new Date(userData.updatedAt).toLocaleDateString('fr-FR')}</p>
             </div>
           </div>
         </div>
@@ -196,8 +282,8 @@ const UserProfile = () => {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-1 mb-6 md:grid-cols-4">
             <TabsTrigger value="general">Informations générales</TabsTrigger>
-            <TabsTrigger value="preferences">Préférences carto</TabsTrigger>
-            <TabsTrigger value="permissions">Permissions</TabsTrigger>
+            <TabsTrigger value="security">Sécurité</TabsTrigger>
+            <TabsTrigger value="preferences">Préférences</TabsTrigger>
             <TabsTrigger value="activity">Activité</TabsTrigger>
           </TabsList>
 
@@ -207,35 +293,22 @@ const UserProfile = () => {
               <CardHeader>
                 <CardTitle>Informations personnelles</CardTitle>
                 <CardDescription>
-                  Gérez vos informations de contact et votre profil professionnel
+                  Gérez vos informations de compte et votre profil professionnel
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="firstName">Prénom</Label>
+                    <Label htmlFor="username">Nom d'utilisateur</Label>
                     <Input
-                      id="firstName"
-                      name="firstName"
-                      value={userData.firstName}
+                      id="username"
+                      name="username"
+                      value={userData.username}
                       onChange={handleInputChange}
                       disabled={!isEditing}
                       prefixIcon={<User className="w-4 h-4" />}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="lastName">Nom</Label>
-                    <Input
-                      id="lastName"
-                      name="lastName"
-                      value={userData.lastName}
-                      onChange={handleInputChange}
-                      disabled={!isEditing}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
                     <Input
@@ -248,250 +321,227 @@ const UserProfile = () => {
                       prefixIcon={<Mail className="w-4 h-4" />}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Téléphone</Label>
-                    <Input
-                      id="phone"
-                      name="phone"
-                      value={userData.phone}
-                      onChange={handleInputChange}
-                      disabled={!isEditing}
-                      prefixIcon={<Phone className="w-4 h-4" />}
-                    />
-                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="organization">Organisation</Label>
+                    <Label htmlFor="profession">Profession</Label>
                     <Input
-                      id="organization"
-                      name="organization"
-                      value={userData.organization}
+                      id="profession"
+                      name="profession"
+                      value={userData.profession}
                       onChange={handleInputChange}
                       disabled={!isEditing}
                       prefixIcon={<Building className="w-4 h-4" />}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="position">Poste</Label>
+                    <Label htmlFor="locationCode">Code de localisation</Label>
                     <Input
-                      id="position"
-                      name="position"
-                      value={userData.position}
+                      id="locationCode"
+                      name="locationCode"
+                      value={userData.locationCode || ""}
                       onChange={handleInputChange}
                       disabled={!isEditing}
+                      prefixIcon={<MapPin className="w-4 h-4" />}
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="region">Région</Label>
-                    <Input
-                      id="region"
-                      name="region"
-                      value={userData.region}
-                      onChange={handleInputChange}
-                      disabled={!isEditing}
-                      prefixIcon={<MapPin className="w-4 h-4" />}
-                    />
+                    <Label>Rôle</Label>
+                    <div className="flex items-center px-3 py-2 border rounded-md border-input bg-muted">
+                      <Shield className="w-4 h-4 mr-2" />
+                      <span>{getRoleLabel(userData.role)}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Le rôle ne peut être modifié que par un administrateur
+                    </p>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="department">Département</Label>
-                    <Input
-                      id="department"
-                      name="department"
-                      value={userData.department}
-                      onChange={handleInputChange}
-                      disabled={!isEditing}
-                      prefixIcon={<MapPin className="w-4 h-4" />}
-                    />
+                    <Label>Statut du compte</Label>
+                    <div className="flex items-center px-3 py-2 border rounded-md border-input bg-muted">
+                      <Activity className="w-4 h-4 mr-2" />
+                      <span>{getStatusLabel(userData.status)}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Le statut ne peut être modifié que par un administrateur
+                    </p>
                   </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="specialization">Spécialisation</Label>
-                  <Input
-                    id="specialization"
-                    name="specialization"
-                    value={userData.specialization}
-                    onChange={handleInputChange}
-                    disabled={!isEditing}
-                    prefixIcon={<Map className="w-4 h-4" />}
-                  />
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
 
-          {/* Préférences cartographiques */}
+          {/* Sécurité */}
+          <TabsContent value="security">
+            <Card>
+              <CardHeader>
+                <CardTitle>Sécurité du compte</CardTitle>
+                <CardDescription>
+                  Gérez votre mot de passe et les paramètres de sécurité
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="p-4 border rounded-lg">
+                  <h4 className="mb-3 font-medium">Changer le mot de passe</h4>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="currentPassword">Mot de passe actuel</Label>
+                      <div className="relative">
+                        <Input
+                          id="currentPassword"
+                          name="currentPassword"
+                          type={showPassword ? "text" : "password"}
+                          value={passwordData.currentPassword}
+                          onChange={handlePasswordChange}
+                          prefixIcon={<Lock className="w-4 h-4" />}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute top-0 right-0 h-full px-3 py-2 hover:bg-transparent"
+                          onClick={() => setShowPassword(!showPassword)}
+                        >
+                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="newPassword">Nouveau mot de passe</Label>
+                      <Input
+                        id="newPassword"
+                        name="newPassword"
+                        type={showPassword ? "text" : "password"}
+                        value={passwordData.newPassword}
+                        onChange={handlePasswordChange}
+                        prefixIcon={<Key className="w-4 h-4" />}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="confirmPassword">Confirmer le nouveau mot de passe</Label>
+                      <Input
+                        id="confirmPassword"
+                        name="confirmPassword"
+                        type={showPassword ? "text" : "password"}
+                        value={passwordData.confirmPassword}
+                        onChange={handlePasswordChange}
+                        prefixIcon={<Key className="w-4 h-4" />}
+                      />
+                    </div>
+
+                    <Button 
+                      onClick={handlePasswordSave}
+                      disabled={isLoading}
+                      className="flex items-center gap-2"
+                    >
+                      {isLoading ? (
+                        <div className="w-4 h-4 border-2 border-white rounded-full border-t-transparent animate-spin"></div>
+                      ) : (
+                        <Save className="w-4 h-4" />
+                      )}
+                      Changer le mot de passe
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="p-4 border rounded-lg">
+                  <h4 className="mb-3 font-medium">Réinitialisation du mot de passe</h4>
+                  <p className="mb-3 text-sm text-muted-foreground">
+                    Si vous avez oublié votre mot de passe, vous pouvez demander une réinitialisation.
+                  </p>
+                  <Button 
+                    variant="outline" 
+                    onClick={requestPasswordReset}
+                    className="flex items-center gap-2"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    Demander une réinitialisation
+                  </Button>
+                </div>
+
+                {userData.resetCode && (
+                  <div className="p-4 border rounded-lg">
+                    <h4 className="mb-3 font-medium">Code de réinitialisation actif</h4>
+                    <p className="mb-2 text-sm text-muted-foreground">
+                      Un code de réinitialisation a été généré le {userData.resetCodeExpiresAt && new Date(userData.resetCodeExpiresAt).toLocaleDateString('fr-FR')}.
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        value={userData.resetCode}
+                        readOnly
+                        className="font-mono"
+                      />
+                      <Button variant="outline" size="icon">
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Préférences */}
           <TabsContent value="preferences">
             <Card>
               <CardHeader>
-                <CardTitle>Préférences cartographiques</CardTitle>
+                <CardTitle>Préférences</CardTitle>
                 <CardDescription>
-                  Personnalisez votre expérience de cartographie et de gestion des parcelles immobilières
+                  Personnalisez votre expérience sur la plateforme
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="defaultView">Vue cartographique par défaut</Label>
-                    <select 
-                      id="defaultView" 
-                      className="flex w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-background"
-                      disabled={!isEditing}
-                      value={userData.mapPreferences.defaultView}
-                    >
-                      <option value="satellite">Satellite</option>
-                      <option value="topographic">Topographique</option>
-                      <option value="hybrid">Hybride</option>
-                      <option value="terrain">Terrain</option>
-                      <option value="street">Plan de ville</option>
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="measurementUnit">Unité de mesure</Label>
-                    <select 
-                      id="measurementUnit" 
-                      className="flex w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-background"
-                      disabled={!isEditing}
-                      value={userData.mapPreferences.measurementUnit}
-                    >
-                      <option value="hectares">Hectares</option>
-                      <option value="acres">Acres</option>
-                      <option value="squareMeters">Mètres carrés</option>
-                      <option value="squareFeet">Pieds carrés</option>
-                    </select>
+                <div className="p-4 border rounded-lg">
+                  <h4 className="mb-3 font-medium">Préférences d'affichage</h4>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="language">Langue</Label>
+                      <select 
+                        id="language" 
+                        className="flex w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-background"
+                      >
+                        <option value="fr">Français</option>
+                        <option value="en">English</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="theme">Thème</Label>
+                      <select 
+                        id="theme" 
+                        className="flex w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-background"
+                      >
+                        <option value="light">Clair</option>
+                        <option value="dark">Sombre</option>
+                        <option value="system">Système</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="defaultRegion">Région par défaut</Label>
-                    <select 
-                      id="defaultRegion" 
-                      className="flex w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-background"
-                      disabled={!isEditing}
-                      value={userData.mapPreferences.defaultRegion}
-                    >
-                      <option value="Libreville">Libreville</option>
-                      <option value="Port-Gentil">Port-Gentil</option>
-                      <option value="Franceville">Franceville</option>
-                      <option value="Oyem">Oyem</option>
-                      <option value="Moanda">Moanda</option>
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="coordinateSystem">Système de coordonnées</Label>
-                    <select 
-                      id="coordinateSystem" 
-                      className="flex w-full h-10 px-3 py-2 text-sm border rounded-md border-input bg-background"
-                      disabled={!isEditing}
-                      value={userData.mapPreferences.coordinateSystem}
-                    >
-                      <option value="WGS84">WGS84 (GPS)</option>
-                      <option value="UTM">UTM Zone 32N</option>
-                      <option value="Gabon">Système Gabon</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Couches par défaut</Label>
-                  <div className="flex flex-wrap gap-4">
-                    {['Parcelles', 'Lotissements', 'Limites administratives', 'Réseau hydrographique', 'Voies de communication', 'Bâtiments', 'Terrains vagues'].map(layer => (
-                      <label key={layer} className="flex items-center space-x-2">
+                <div className="p-4 border rounded-lg">
+                  <h4 className="mb-3 font-medium">Notifications</h4>
+                  <div className="space-y-3">
+                    {[
+                      { id: "notif-email", label: "Notifications par email", defaultChecked: true },
+                      { id: "notif-updates", label: "Mises à jour du système", defaultChecked: true },
+                      { id: "notif-security", label: "Alertes de sécurité", defaultChecked: true },
+                      { id: "notif-news", label: "Nouvelles et annonces", defaultChecked: false },
+                    ].map((notif) => (
+                      <label key={notif.id} className="flex items-center space-x-2">
                         <input 
                           type="checkbox" 
+                          id={notif.id}
+                          defaultChecked={notif.defaultChecked}
                           className="text-blue-600 rounded" 
-                          disabled={!isEditing}
-                          defaultChecked
                         />
-                        <span>{layer}</span>
+                        <span className="text-sm">{notif.label}</span>
                       </label>
                     ))}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Permissions */}
-          <TabsContent value="permissions">
-            <Card>
-              <CardHeader>
-                <CardTitle>Permissions et accès</CardTitle>
-                <CardDescription>
-                  Aperçu de vos droits d'accès sur la plateforme de gestion foncière
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div className="p-4 border border-green-200 rounded-lg bg-green-50">
-                    <div className="flex items-center">
-                      <Shield className="w-5 h-5 mr-3 text-green-600" />
-                      <div>
-                        <h4 className="font-medium text-green-800">Accès autorisés</h4>
-                        <p className="text-sm text-green-700">Vous pouvez effectuer ces actions</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="p-4 border border-red-200 rounded-lg bg-red-50">
-                    <div className="flex items-center">
-                      <Shield className="w-5 h-5 mr-3 text-red-600" />
-                      <div>
-                        <h4 className="font-medium text-red-800">Accès restreints</h4>
-                        <p className="text-sm text-red-700">Ces actions nécessitent des droits supplémentaires</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div className="space-y-3">
-                    <h4 className="font-medium text-gray-900">Gestion des parcelles</h4>
-                    <div className="space-y-2">
-                      {[
-                        { name: "Créer des parcelles", allowed: userData.permissions.canCreatePlots },
-                        { name: "Modifier des parcelles", allowed: userData.permissions.canEditPlots },
-                        { name: "Supprimer des parcelles", allowed: userData.permissions.canDeletePlots }
-                      ].map((permission, index) => (
-                        <div key={index} className="flex items-center justify-between">
-                          <span className="text-sm text-gray-700">{permission.name}</span>
-                          <div className={`w-3 h-3 rounded-full ${permission.allowed ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <h4 className="font-medium text-gray-900">Fonctionnalités avancées</h4>
-                    <div className="space-y-2">
-                      {[
-                        { name: "Gérer les utilisateurs", allowed: userData.permissions.canManageUsers },
-                        { name: "Exporter des données", allowed: userData.permissions.canExportData },
-                        { name: "Générer des rapports", allowed: userData.permissions.canGenerateReports }
-                      ].map((permission, index) => (
-                        <div key={index} className="flex items-center justify-between">
-                          <span className="text-sm text-gray-700">{permission.name}</span>
-                          <div className={`w-3 h-3 rounded-full ${permission.allowed ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-4 border border-blue-200 rounded-lg bg-blue-50">
-                  <div className="flex items-start">
-                    <Settings className="w-5 h-5 mr-3 text-blue-500 mt-0.5" />
-                    <div>
-                      <h4 className="font-medium text-blue-800">Demande de permissions</h4>
-                      <p className="text-sm text-blue-700">
-                        Si vous avez besoin de droits supplémentaires, contactez votre administrateur système.
-                      </p>
-                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -504,18 +554,17 @@ const UserProfile = () => {
               <CardHeader>
                 <CardTitle>Activité récente</CardTitle>
                 <CardDescription>
-                  Historique de vos actions sur la plateforme de gestion foncière
+                  Historique de vos actions sur la plateforme
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   {[
-                    { action: "Création de parcelle", date: "2024-01-20T09:30:00Z", details: "Parcelle #LBR-2024-001", icon: <Home className="w-4 h-4 text-blue-600" /> },
-                    { action: "Modification de limites", date: "2024-01-19T14:22:00Z", details: "Parcelle #LBR-2023-089", icon: <MapPin className="w-4 h-4 text-green-600" /> },
-                    { action: "Export de données", date: "2024-01-18T11:05:00Z", details: "Format Shapefile - Lotissement Centre", icon: <FileText className="w-4 h-4 text-purple-600" /> },
-                    { action: "Génération de rapport", date: "2024-01-17T16:40:00Z", details: "Rapport mensuel - Janvier 2024", icon: <BarChart3 className="w-4 h-4 text-orange-600" /> },
-                    { action: "Import de données", date: "2024-01-16T10:15:00Z", details: "Fichier CSV - 25 nouvelles parcelles", icon: <Layers className="w-4 h-4 text-indigo-600" /> },
-                    { action: "Validation de lotissement", date: "2024-01-15T08:45:00Z", details: "Lotissement Akanda - 15 parcelles", icon: <Building className="w-4 h-4 text-teal-600" /> }
+                    { action: "Connexion au compte", date: "2024-01-20T14:22:00Z", details: "IP: 192.168.1.1", icon: <User className="w-4 h-4 text-blue-600" /> },
+                    { action: "Modification du profil", date: "2024-01-19T11:05:00Z", details: "Informations professionnelles", icon: <Edit className="w-4 h-4 text-green-600" /> },
+                    { action: "Consultation de carte", date: "2024-01-18T16:40:00Z", details: "Région de Libreville", icon: <Map className="w-4 h-4 text-purple-600" /> },
+                    { action: "Génération de rapport", date: "2024-01-17T10:15:00Z", details: "Rapport mensuel - Janvier 2024", icon: <FileText className="w-4 h-4 text-orange-600" /> },
+                    { action: "Export de données", date: "2024-01-16T08:45:00Z", details: "Format CSV - 15 enregistrements", icon: <Download className="w-4 h-4 text-indigo-600" /> },
                   ].map((activity, index) => (
                     <div key={index} className="flex items-start p-3 transition-colors border rounded-lg hover:bg-gray-50">
                       <div className="flex items-center justify-center w-8 h-8 mr-3 bg-gray-100 rounded-full">

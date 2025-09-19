@@ -2,6 +2,7 @@
 import * as React from "react"
 import { X } from "lucide-react"
 import { cva, type VariantProps } from "class-variance-authority"
+import { motion } from "framer-motion";
 
 import { cn } from "../../lib/utils"
 import { useToast } from "../../hooks/useToast"
@@ -19,7 +20,7 @@ const ToastProvider = ({ children }: { children: React.ReactNode }) => {
 
 const ToastViewport = ({ toasts }: { toasts: any[] }) => {
   return (
-    <div className="fixed top-16 z-100 flex max-h-screen w-full flex-col-reverse p-4 sm:bottom-24 sm:right-0 sm:top-auto sm:flex-col md:max-w-[420px]">
+    <div className="fixed top-16 z-100 flex max-h-screen max-w-full flex-col-reverse p-2 sm:bottom-24 sm:right-0 sm:top-auto sm:flex-col md:max-w-[420px]">
       {toasts.map((toast) => (
         <Toast key={toast.id} toast={toast} />
       ))}
@@ -47,7 +48,11 @@ const Toast = ({ toast }: { toast: any }) => {
   const { dismiss } = useToast()
 
   return (
-    <div className={toastVariants({ variant: toast.variant })}>
+    <motion.div 
+      className={toastVariants({ variant: toast.variant })}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+    >
       <div className="grid gap-1">
         {toast.title && (
           <div className="text-sm font-semibold">{toast.title}</div>
@@ -62,7 +67,7 @@ const Toast = ({ toast }: { toast: any }) => {
       >
         <X className="w-4 h-4 cursor-pointer" />
       </button>
-    </div>
+    </motion.div>
   )
 }
 
