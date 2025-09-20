@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Outlet } from "react-router-dom";
 import Header from "../partials/Header";
-import MapComponent from "../maps/MapComponent";
 import MapToolbar from "../partials/MapToolbar";
+import Map2D from "../maps/Map2D";
 
 const MapLayout = () => {
 
@@ -13,7 +13,8 @@ const MapLayout = () => {
       
       {/* Contenu principal avec la carte */}
       <main className='flex flex-col flex-1 flex-grow'>
-        <MapComponent />
+        {/* <Map2D /> */}
+        <Outlet />
       </main>
 
       {/* Barre d'outils en bas */}

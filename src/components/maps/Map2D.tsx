@@ -47,7 +47,7 @@ interface MapViewport {
   zoom: number;
 }
 
-const MapComponent = () => {
+const Map2D = () => {
   const [viewport, setViewport] = useState<MapViewport>({
     center: [3.868177, 11.519596],
     zoom: 16
@@ -547,4 +547,4 @@ const MapComponent = () => {
   );
 };
 
-export default MapComponent;
+export default Map2D;

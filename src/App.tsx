@@ -16,6 +16,8 @@ import DashboardLayout from './components/layouts/DashboardLayout';
 import AdminUsersPage from './pages/dashboard/AdminUsersPage';
 import AdminDashboard from './pages/dashboard/AdminDashboard';
 import AdminObservations from './pages/dashboard/AdminObservations';
+import Map2D from './components/maps/Map2D';
+import Map3D from './components/maps/Map3D';
 
 function App() {
   const { isAuthenticated } = useAuth();
@@ -55,7 +57,11 @@ function App() {
           <AuthProtectedRoute>
             <MapLayout />
           </AuthProtectedRoute>
-        } />
+        } >
+          <Route path='/map/' element={ <Navigate to={`/map/2D`} replace /> } />
+          <Route path='/map/2D' element={<Map2D />} />
+          <Route path='/map/3D' element={<Map3D />} />
+        </Route>
 
         <Route path='/403' element={<Forbidden />} />
 
