@@ -112,14 +112,14 @@ const FileMenu = () => {
 
     useEffect(() => {
         const loadTowns = async () => {
-            const response = await dispatch(getTowns({ "arrondId": housingEstateForm.arrondissement }));
+            const response = await dispatch(getTowns({ "arrondId": housingEstateForm.district }));
 
             console.log("LOADED Towns", response);
             console.log("LOADED Towns From state", townsFromStates);
         }
 
         loadTowns();
-    }, [housingEstateForm.arrondissement]);
+    }, [housingEstateForm.district]);
 
     // Helper function to format file size
     const formatFileSize = (bytes: number): string => {

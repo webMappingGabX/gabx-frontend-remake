@@ -18,6 +18,10 @@ import AdminDashboard from './pages/dashboard/AdminDashboard';
 import AdminObservations from './pages/dashboard/AdminObservations';
 import Map2D from './components/maps/Map2D';
 import Map3D from './components/maps/Map3D';
+import OSMBuildingsMap from './components/maps/OSMBuildingsMap';
+import UserObservationsPage from './pages/ObservationsPage';
+import DrawableLeafletMap from './components/maps/DrawableLeafletMap';
+import PlotEditionPage from './pages/PlotEditionPage';
 
 function App() {
   const { isAuthenticated } = useAuth();
@@ -39,7 +43,7 @@ function App() {
         }>
           {/* <Route path='/' element={ <Navigate to={`/map`} replace /> } /> */}
           <Route path='/admin' element={<UserProfile />} />
-          <Route path='/observations' element={<UserProfile />} />
+          <Route path='/observations' element={<UserObservationsPage />} />
           <Route path='/profile' element={<UserProfile />} />
         </Route>
 
@@ -61,6 +65,10 @@ function App() {
           <Route path='/map/' element={ <Navigate to={`/map/2D`} replace /> } />
           <Route path='/map/2D' element={<Map2D />} />
           <Route path='/map/3D' element={<Map3D />} />
+          <Route path='/map/osm-buildings' element={<OSMBuildingsMap />} />
+          <Route path='/map/drawable' element={<DrawableLeafletMap />} />
+
+          <Route path='/map/plot-edition' element={<PlotEditionPage />} />
         </Route>
 
         <Route path='/403' element={<Forbidden />} />

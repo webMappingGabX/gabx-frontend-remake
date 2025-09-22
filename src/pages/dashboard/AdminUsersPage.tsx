@@ -63,7 +63,7 @@ const AdminUsersPage = () => {
   const [isUserFormOpen, setIsUserFormOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
-const [userToDelete, setUserToDelete] = useState<string | null>(null);
+  const [userToDelete, setUserToDelete] = useState<string | null>(null);
 
   const { toast } = useToast();
   const dispatch = useDispatch();

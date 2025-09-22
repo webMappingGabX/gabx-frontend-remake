@@ -32,8 +32,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../co
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { useToast } from "../hooks/useToast";
-import { useSelector } from "react-redux";
-import { selectUser } from "../app/store/slices/authSlice";
+import { useDispatch, useSelector } from "react-redux";
+import { selectAuthError, selectAuthLoading, selectUser } from "../app/store/slices/authSlice";
+import { changeUserPassword, selectUsersError, updateAccount } from "../app/store/slices/usersSlice";
 
 // Types basés sur votre modèle User
 interface UserProfile {
@@ -59,6 +60,12 @@ const UserProfile = () => {
   const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
 
+  const dispatch = useDispatch();
+
+  const authLoadingFromState = useSelector(selectAuthLoading);
+  const authErrorFromState = useSelector(selectAuthError);
+  const usersErrorFromState = useSelector(selectUsersError);
+
   const authUser = useSelector(selectUser);
   
   // Données utilisateur adaptées à votre modèle
@@ -67,7 +74,7 @@ const UserProfile = () => {
     username: "thomas_martin",
     email: "thomas.martin@agence-territoriale.gab",
     role: "EXPERT",
-    profession: "Géomaticien Senior",
+    profession: "",
     status: "ACTIVE",
     locationCode: "LBV-EST-001",
     createdAt: "2024-01-15T10:30:00Z",
@@ -79,6 +86,15 @@ const UserProfile = () => {
     newPassword: "",
     confirmPassword: ""
   });
+
+  useEffect(() => {
+    // console.log("AUTH USER", authUser);
+    setUserData(authUser as UserProfile);
+  }, [authUser]);
+
+  /*useEffect(() => {
+    console.log("USER DATA", userData);
+  }, [userData]);*/
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -109,15 +125,27 @@ const UserProfile = () => {
 
   const handleSave = async () => {
     setIsLoading(true);
-    // Simulation de sauvegarde
-    setTimeout(() => {
+    
+    const response = await dispatch(updateAccount(userData));
+
+    console.log("RESPONSE", response);
+    
+    if(!usersErrorFromState) {
+      setIsEditing(false);
+      setIsLoading(false);
+      toast({
+        title: "Profil mis à jour",
+        description: "Vos informations ont été enregistrées avec succès.",
+      });
+    }
+    /*setTimeout(() => {
       setIsLoading(false);
       setIsEditing(false);
       toast({
         title: "Profil mis à jour",
         description: "Vos informations ont été enregistrées avec succès.",
       });
-    }, 1500);
+    }, 1500);*/
   };
 
   const handlePasswordSave = async () => {
@@ -131,8 +159,38 @@ const UserProfile = () => {
     }
 
     setIsLoading(true);
-    // Simulation de changement de mot de passe
-    setTimeout(() => {
+    
+    const pwdData = {
+      "password": passwordData.currentPassword,
+      "newPassword": passwordData.newPassword
+    }
+    const response = await dispatch(changeUserPassword(pwdData));
+
+    if(response.type.includes("fulfilled")) {
+      setIsEditing(false);
+      setIsLoading(false);
+
+      setPasswordData({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: ""
+      });
+      
+      toast({
+        title: "Mot de passe modifié",
+        description: "Votre mot de passe a été changé avec succès.",
+      });
+    } else {
+      setIsLoading(false);
+      toast({
+        title: "Echec de la modification",
+        description: "Mot de passe incorrect",
+        variant: "destructive"
+      });
+
+    }
+
+    /*setTimeout(() => {
       setIsLoading(false);
       setPasswordData({
         currentPassword: "",
@@ -143,7 +201,7 @@ const UserProfile = () => {
         title: "Mot de passe modifié",
         description: "Votre mot de passe a été changé avec succès.",
       });
-    }, 1500);
+    }, 1500);*/
   };
 
   const handleCancel = () => {
@@ -336,7 +394,7 @@ const UserProfile = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="locationCode">Code de localisation</Label>
+                    <Label htmlFor="locationCode">Code de location</Label>
                     <Input
                       id="locationCode"
                       name="locationCode"
@@ -449,7 +507,7 @@ const UserProfile = () => {
                   </div>
                 </div>
 
-                <div className="p-4 border rounded-lg">
+                {/* <div className="p-4 border rounded-lg">
                   <h4 className="mb-3 font-medium">Réinitialisation du mot de passe</h4>
                   <p className="mb-3 text-sm text-muted-foreground">
                     Si vous avez oublié votre mot de passe, vous pouvez demander une réinitialisation.
@@ -462,7 +520,7 @@ const UserProfile = () => {
                     <RefreshCw className="w-4 h-4" />
                     Demander une réinitialisation
                   </Button>
-                </div>
+                </div> */}
 
                 {userData.resetCode && (
                   <div className="p-4 border rounded-lg">

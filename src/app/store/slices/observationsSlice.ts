@@ -8,7 +8,7 @@ export interface Observation {
     category?: string;
     scale?: number;
     content?: string;
-    userId?: number;
+    userId?: string;
 }
 
 export interface ObservationState {
@@ -25,6 +25,7 @@ export interface ObservationState {
     filters: {
         search?: string;
         category?: string;
+        userId?: number;
         sortBy?: string;
         sortOrder?: "ASC" | "DESC";
     };
@@ -55,6 +56,7 @@ export const fetchObservations = createAsyncThunk(
         search?: string;
         page?: number;
         limit?: number;
+        userId?: string;
         observation?: string;
         sortBy?: string;
         sortOrder?: "ASC" | "DESC";
@@ -89,6 +91,7 @@ export const updateObs = createAsyncThunk(
     'plots/updateUser',
     async ({ id, obsData }: { id: string; obsData: Omit<Observation, 'id' | 'createdAt' | 'updatedAt'> }) => {
         const response = await axios.patch(`/observations/${id}`, obsData);
+        console.log("UPDATE OBSERVATION RESPONSE", response.data);
         return response.data;
     }
 );

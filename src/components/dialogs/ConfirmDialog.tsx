@@ -65,7 +65,7 @@ import {
   
     return (
       <Dialog open={isOpen} onOpenChange={handleClose}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md z-[1800]">
           <DialogHeader>
             <div className="flex items-center gap-3">
               {variantStyles.icon}

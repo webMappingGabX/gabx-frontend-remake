@@ -98,10 +98,10 @@ export const fetchPlots = createAsyncThunk(
     }
 );
 
-export const fetchPlotByCode = createAsyncThunk(
-    'plots/fetchPlotByCode',
-    async (code: string) => {
-        const response = await axios.get(`/plots/${code}`);
+export const fetchPlotById = createAsyncThunk(
+    'plots/fetchPlotById',
+    async (id) => {
+        const response = await axios.get(`/plots/${id}`);
         return response.data;
     }
 );
@@ -199,15 +199,15 @@ const plotSlice = createSlice({
 
         // Fetch plot by code
         builder
-            .addCase(fetchPlotByCode.pending, (state) => {
+            .addCase(fetchPlotById.pending, (state) => {
                 state.loading = true;
                 state.error = null;
             })
-            .addCase(fetchPlotByCode.fulfilled, (state, action) => {
+            .addCase(fetchPlotById.fulfilled, (state, action) => {
                 state.loading = false;
                 state.currentPlot = action.payload;
             })
-            .addCase(fetchPlotByCode.rejected, (state, action) => {
+            .addCase(fetchPlotById.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.error.message || 'Failed to fetch plot';
             });

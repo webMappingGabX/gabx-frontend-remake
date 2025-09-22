@@ -21,8 +21,9 @@ import 'leaflet/dist/leaflet.css';
 import { useDispatch, useSelector } from "react-redux";
 import { AvailableMenus, selectLayers, selectMenu, selectSearch } from "../../app/store/slices/settingSlice";
 import FileMenu from "../menus/FileMenu";
-import { fetchPlots, selectPlots } from "../../app/store/slices/plotSlice";
+import { fetchPlots, selectPlots, setCurrentPlot } from "../../app/store/slices/plotSlice";
 import { isFulfilled } from "@reduxjs/toolkit";
+import { useNavigate } from "react-router-dom";
 
 // Icônes personnalisées pour Leaflet (important pour le bon affichage)
 delete (L.Icon.Default.prototype as { _getIconUrl?: string })._getIconUrl;
@@ -73,6 +74,7 @@ const Map2D = () => {
   const currentOpenedMenu = useSelector(selectMenu);
   const selectedPlots = useSelector(selectPlots);
 
+  const navigate = useNavigate();
   const [parcelles, setParcelles] = useState<Parcelle[]>([
     {
       id: "YDE-001",
@@ -257,7 +259,7 @@ const Map2D = () => {
       }
       });
     });*/
-    console.log("PARCELLES     ", parcelles);
+    //console.log("PARCELLES     ", parcelles);
   }, [parcelles, selectedParcelle, parcelleLayers]);
 
   useEffect(() => {
@@ -426,16 +428,19 @@ const Map2D = () => {
           animate={{ opacity: 1, y: 0 }}
           className="absolute z-[1000] max-w-sm top-14 left-4"
         >
-          <Card>
+          <Card className="py-2">
             <CardContent className="p-4">
               <div className="flex items-start justify-between">
                 <div>
                   <h3 className="text-lg font-bold">{selectedParcelle.nom}</h3>
-                  <p className="text-sm text-slate-600 dark:text-slate-400">
-                    ID: {selectedParcelle.id} | {selectedParcelle.superficie} ha
+                  <p className="pb-2 text-sm text-slate-600 dark:text-slate-400">
+                    CODE: {selectedParcelle.code} | {selectedParcelle.area} ha
                   </p>
-                  <p className="text-sm">Type: {selectedParcelle.type}</p>
-                  <p className="text-sm">Propriétaire: {selectedParcelle.proprietaire}</p>
+                  <p className="text-sm">Titre foncié: {selectedParcelle.TFNumber != null ? selectedParcelle.TFNumber : "Non spécifié"}</p>
+                  <p className="text-sm">Prix: {selectedParcelle.price | 0} XAF</p>
+                  <p className="text-sm">Lieu: {selectedParcelle.place != null ? selectedParcelle.place : "Non spécifié"}</p>
+                  <p className="text-sm">Année d'acquisition : {selectedParcelle.acquiredYear != null ? selectedParcelle.acquiredYear : "Non spécifiée"}</p>
+                  <p className="text-sm">Cité : {selectedParcelle.housingEstate != null ? selectedParcelle.housingEstate.name : "Aucune"}</p>
                 </div>
                 <Button 
                   variant="ghost" 
@@ -446,8 +451,12 @@ const Map2D = () => {
                 </Button>
               </div>
               <div className="flex gap-2 mt-3">
-                <Button size="sm" variant="outline">Détails</Button>
-                <Button size="sm">Modifier</Button>
+                {/* <Button size="sm" variant="outline">Modifier la géométrie</Button> */}
+                <Button size="sm" className="cursor-pointer" onClick={() => {
+                  dispatch(setCurrentPlot(selectedParcelle));
+                  
+                  navigate("/map/plot-edition");
+                }}>Modifier les infos</Button>
               </div>
             </CardContent>
           </Card>

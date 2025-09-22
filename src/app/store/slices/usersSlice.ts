@@ -126,17 +126,40 @@ export const fetchMe = createAsyncThunk(
 
 export const updateAccount = createAsyncThunk(
     'plots/updateAccount',
-    async () => {
-        const response = await axios.get(`/users/update-account`);
-        return response.data;
+    async (userData) => {
+        try {
+            const response = await axios.patch(`/users/me/update-account`, userData);
+            return response.data;
+        } catch (err) {
+            console.log("UPDATE ACCOUNT ERROR", err);
+            throw err;
+        }
     }
 );
 
 export const deleteAccount = createAsyncThunk(
     'plots/deleteAccount',
     async () => {
-        const response = await axios.get(`/users/delete-account`);
-        return response.data;
+        try {
+            const response = await axios.delete(`/users/me/delete-account`);
+            return response.data;
+        } catch (err) {
+            console.log("ERROR DELETING ACCOUNT", err);
+            throw err;
+        }
+    }
+);
+
+export const changeUserPassword = createAsyncThunk(
+    'plots/changeUserPassword',
+    async (pwdData) => {
+        try {
+            const response = await axios.patch(`/users/me/change-password`, pwdData);
+            return response.data;
+        } catch (err) {
+            console.log("ERROR CHANGING PASSWORD", err);
+            throw err;
+        }
     }
 );
 
@@ -305,6 +328,20 @@ const userSlice = createSlice({
             .addCase(deleteAccount.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.error.message || 'Failed to delete account';
+            });
+
+        // Change user password
+        builder
+            .addCase(changeUserPassword.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(changeUserPassword.fulfilled, (state, action) => {
+                state.loading = false;
+            })
+            .addCase(changeUserPassword.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.error.message || 'Failed to change user password';
             });
     }
 });

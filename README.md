@@ -32,6 +32,12 @@ npm install -g yarn
 yarn install
 ```
 
+### (Bonus) Création des composants Shadcn
+
+```bash
+npx shadcn@latest add <component>
+```
+
 ## 🚦 Démarrage de l'Application
 
 ### Développement
@@ -57,6 +63,9 @@ L'application sera disponible à l'adresse http://localhost:8070.
 - proj4 et turf pour la manipulation des données géospatiales
 - jspdf pour la génération de pdf
 - tailwind css
+- shadcn
+- framer-motion
+- osmbuildings (carte 3D)
 ```
 
 ## 📝 Structure du Projet
