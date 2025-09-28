@@ -11,17 +11,18 @@ import { Button } from "../components/ui/button";
 import { Textarea } from "../components/ui/textarea";
 import { useToast } from "../hooks/useToast";
 import { createPlot, fetchPlotById, selectCurrentPlot, selectPlotsLoading, setCurrentPlot, updatePlot } from "../app/store/slices/plotSlice";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import DrawableLeafletMap from "../components/maps/DrawableLeafletMap";
 
 export interface PlotFormData {
     id?: string;
     code: string;
     geom?: Record<string, unknown>;
-    region?: string;
-    department?: string;
-    arrondissement?: string;
-    town?: string;
-    place?: string;
+    region: string;
+    department: string;
+    arrondissement: string;
+    town: string;
+    place: string;
     TFnumber?: string;
     acquiredYear?: string;
     classification?: string;
@@ -34,12 +35,12 @@ export interface PlotFormData {
 }
 
 interface PlotEditionPageProps {
-    plotId?: string;
+    plotId?: string | null;
     onCancel?: () => void;
     onSuccess?: () => void;
 }
 
-const PlotEditionPage = ({ plotId, onCancel, onSuccess }: PlotEditionPageProps) => {
+const PlotEditionPage = ({ plotId = null, onCancel, onSuccess }: PlotEditionPageProps) => {
     const [formData, setFormData] = useState<PlotFormData>({
         code: "",
         region: '',
@@ -71,12 +72,14 @@ const PlotEditionPage = ({ plotId, onCancel, onSuccess }: PlotEditionPageProps) 
 
     const navigate = useNavigate();
 
+    const location = useLocation();
+    const editingMode = location.state?.editingMode;
     // Charger les données de la parcelle si en mode édition
-    useEffect(() => {
+    /*useEffect(() => {
         if (plotId) {
             dispatch(fetchPlotById(plotId) as any);
         }
-    }, [plotId, dispatch]);
+    }, [plotId, dispatch]);*/
     
     // Mettre à jour le formulaire avec les données de la parcelle
     useEffect(() => {
@@ -85,10 +88,10 @@ const PlotEditionPage = ({ plotId, onCancel, onSuccess }: PlotEditionPageProps) 
             console.log("CURRENT PLOT", currentPlot);
             setFormData({
                 code: currentPlot.code || "",
-                region: currentPlot.region || "",
-                department: currentPlot.department || "",
-                arrondissement: currentPlot.arrondissement || "",
-                town: currentPlot.town || "",
+                region: currentPlot.regionId?.toString() || "",
+                department: currentPlot.departmentId?.toString() || "",
+                arrondissement: currentPlot.arrondissementId?.toString() || "",
+                town: currentPlot.townId?.toString() || "",
                 place: currentPlot.place || "",
                 TFnumber: currentPlot.TFnumber || "",
                 acquiredYear: currentPlot.acquiredYear || "",
@@ -109,7 +112,7 @@ const PlotEditionPage = ({ plotId, onCancel, onSuccess }: PlotEditionPageProps) 
             try {
                 await dispatch(getRegions() as any);
 
-                console.log("REGIONS FROM STATE", regionsFromState);
+                // console.log("REGIONS FROM STATE", regionsFromState);
             } catch (err) {
                 console.log("FAILED TO LOAD REGIONS", err);
                 toast({
@@ -129,7 +132,7 @@ const PlotEditionPage = ({ plotId, onCancel, onSuccess }: PlotEditionPageProps) 
             try {
                 await dispatch(getDepts({ regionId: formData.region }) as any);
                 
-                console.log("LOADS DEPTS", deptsFromStates);
+                // console.log("LOADS DEPTS", deptsFromStates);
             } catch (err) {
                 console.log("FAILED TO LOAD DEPARTMENTS", err);
             }
@@ -137,7 +140,7 @@ const PlotEditionPage = ({ plotId, onCancel, onSuccess }: PlotEditionPageProps) 
 
         loadDepts();
     }, [formData.region, dispatch]);
-
+    
     // Charger les arrondissements quand le département change
     useEffect(() => {
         const loadArronds = async () => {
@@ -178,7 +181,7 @@ const PlotEditionPage = ({ plotId, onCancel, onSuccess }: PlotEditionPageProps) 
 
                 await dispatch(fetchHousingEstates(params) as any);
                 
-                console.log("HE", housingEstatesFromState);
+                // console.log("HE", housingEstatesFromState);
             } catch (err) {
                 console.log("FAILED TO LOAD HOUSING ESTATES", err);
             }
@@ -194,17 +197,13 @@ const PlotEditionPage = ({ plotId, onCancel, onSuccess }: PlotEditionPageProps) 
         }));
     }
 
-    const handleSelectChange = (key: string, value: string) => {
+    const handleSelectChange = (field: keyof PlotFormData, value: string) => {
         
         setFormData(prevData => ({
             ...prevData,
-            [key]: value
+            [field]: value
         }));
     }
-
-    useEffect(() => {
-        console.log("FORM DATA", formData);
-    }, [formData]);
 
     const handleSubmitPlot = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -252,7 +251,13 @@ const PlotEditionPage = ({ plotId, onCancel, onSuccess }: PlotEditionPageProps) 
             animate={{ opacity: 1, height: "auto" }}
             transition={{ duration: 0.3 }}
         >
-            <Card>
+            {/* Add Drawable leaflet map */}
+            <DrawableLeafletMap 
+                currentPlot={currentPlot}
+            />
+            
+            {/* Editable Form */}
+            <Card className="m-4">
                 <CardHeader>
                     <CardTitle>
                         {plotId ? "Modifier les infos de la parcelle" : "Créer une nouvelle parcelle"}
@@ -288,8 +293,8 @@ const PlotEditionPage = ({ plotId, onCancel, onSuccess }: PlotEditionPageProps) 
                                         <SelectValue placeholder="Sélectionnez un statut" />
                                     </SelectTrigger>
                                     <SelectContent className="z-[1500]">
-                                        <SelectItem value="BATI" defaultChecked>Bâti</SelectItem>
-                                        <SelectItem value="NON BATI">Non bâti</SelectItem>
+                                        <SelectItem key={1} value="BATI" defaultChecked>Bâti</SelectItem>
+                                        <SelectItem key={2} value="NON BATI">Non bâti</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -309,7 +314,7 @@ const PlotEditionPage = ({ plotId, onCancel, onSuccess }: PlotEditionPageProps) 
                                     <SelectContent className="z-[1500]">
                                         {regionsFromState?.map((region, index) => {
                                             return (
-                                                <SelectItem key={`reg-${region.id}-${index}`} value={region.id}>
+                                                <SelectItem key={`reg-${region.id}-${index}`} value={region.id.toString()}>
                                                     {region.name}
                                                 </SelectItem>
                                             )
@@ -331,7 +336,7 @@ const PlotEditionPage = ({ plotId, onCancel, onSuccess }: PlotEditionPageProps) 
                                     </SelectTrigger>
                                     <SelectContent className="z-[1500]">
                                         {deptsFromStates?.map((department, index) => (
-                                            <SelectItem key={`dept-${department.id}-${index}`} value={department.id}>
+                                            <SelectItem key={`dept-${department.id}-${index}`} value={department.id.toString()}>
                                                 {department.name}
                                             </SelectItem>
                                         ))}
@@ -354,7 +359,7 @@ const PlotEditionPage = ({ plotId, onCancel, onSuccess }: PlotEditionPageProps) 
                                     </SelectTrigger>
                                     <SelectContent className="z-[1500]">
                                         {arrondsFromStates?.map((arrond, index) => (
-                                            <SelectItem key={`arrond-${arrond.id}-${index}`} value={arrond.id}>
+                                            <SelectItem key={`arrond-${arrond.id}-${index}`} value={arrond.id.toString()}>
                                                 {arrond.name}
                                             </SelectItem>
                                         ))}
@@ -375,7 +380,7 @@ const PlotEditionPage = ({ plotId, onCancel, onSuccess }: PlotEditionPageProps) 
                                     </SelectTrigger>
                                     <SelectContent className="z-[1500]">
                                         {townsFromStates?.map((town, index) => (
-                                            <SelectItem key={`town-${town.id}-${index}`} value={town.id}>
+                                            <SelectItem key={`town-${town.id}-${index}`} value={town.id.toString()}>
                                                 {town.name}
                                             </SelectItem>
                                         ))}
@@ -404,7 +409,7 @@ const PlotEditionPage = ({ plotId, onCancel, onSuccess }: PlotEditionPageProps) 
                                     value={formData.housingEstate}
                                     onValueChange={(value) => handleSelectChange('housingEstate', value)}
                                 >
-                                    <SelectTrigger>
+                                    <SelectTrigger className="w-full">
                                         <SelectValue placeholder="Sélectionnez une cité" />
                                     </SelectTrigger>
                                     <SelectContent className="z-[1500]">

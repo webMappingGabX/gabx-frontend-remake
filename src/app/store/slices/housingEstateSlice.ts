@@ -120,8 +120,14 @@ export const fetchHousingEstates = createAsyncThunk(
         sortBy?: string;
         sortOrder?: "ASC" | "DESC";
     } = {}) => {
-        const response = await axios.get('/housing-estates', { params });
-        return response.data;
+        try {
+            const response = await axios.get('/housing-estates', { params });
+            console.log("FETCH HE RESPONSE", response);
+            return response.data;
+        } catch (err) {
+            console.log("FETCH HE Error", err);
+            throw err;
+        }
     }
 );
 
@@ -227,9 +233,11 @@ const housingEstateSlice = createSlice({
                 state.loading = false;
                 const housingEstates = action.payload.data || action.payload;
                 // Propagate housing estate attributes to their plots
-                state.housingEstates = Array.isArray(housingEstates) 
+                /*state.housingEstates = Array.isArray(housingEstates) 
                     ? housingEstates.map(propagateHousingEstateAttributes)
-                    : housingEstates;
+                    : housingEstates;*/
+                console.log("LOADED HOUSING ESTATES", housingEstates);
+                state.housingEstates = housingEstates;
                 if (action.payload.pagination) {
                     state.pagination = action.payload.pagination;
                 }
@@ -248,7 +256,8 @@ const housingEstateSlice = createSlice({
             .addCase(fetchHousingEstateById.fulfilled, (state, action) => {
                 state.loading = false;
                 // Propagate housing estate attributes to its plots
-                state.currentHousingEstate = propagateHousingEstateAttributes(action.payload);
+                // state.currentHousingEstate = propagateHousingEstateAttributes(action.payload);
+                state.currentHousingEstate = action.payload;
             })
             .addCase(fetchHousingEstateById.rejected, (state, action) => {
                 state.loading = false;
@@ -265,7 +274,8 @@ const housingEstateSlice = createSlice({
                 state.loading = false;
                 if (action.payload.housingEstate) {
                     // Propagate housing estate attributes to its plots
-                    const housingEstateWithPropagatedAttributes = propagateHousingEstateAttributes(action.payload.housingEstate);
+                    // const housingEstateWithPropagatedAttributes = propagateHousingEstateAttributes(action.payload.housingEstate);
+                    const housingEstateWithPropagatedAttributes = action.payload.housingEstate;
                     state.housingEstates.push(housingEstateWithPropagatedAttributes);
                 }
             })
@@ -284,7 +294,8 @@ const housingEstateSlice = createSlice({
                 state.loading = false;
                 if (action.payload.housingEstate) {
                     // Propagate housing estate attributes to its plots
-                    const housingEstateWithPropagatedAttributes = propagateHousingEstateAttributes(action.payload.housingEstate);
+                    // const housingEstateWithPropagatedAttributes = propagateHousingEstateAttributes(action.payload.housingEstate);
+                    const housingEstateWithPropagatedAttributes = action.payload.housingEstate;
                     
                     const index = state.housingEstates.findIndex(he => he.id === housingEstateWithPropagatedAttributes.id);
                     if (index !== -1) {
@@ -342,9 +353,10 @@ const housingEstateSlice = createSlice({
             .addCase(fetchHousingEstatesByRegion.fulfilled, (state, action) => {
                 state.loading = false;
                 // Propagate housing estate attributes to their plots
-                state.housingEstates = Array.isArray(action.payload) 
+                /*state.housingEstates = Array.isArray(action.payload) 
                     ? action.payload.map(propagateHousingEstateAttributes)
-                    : action.payload;
+                    : action.payload;*/
+                state.housingEstates = action.payload;
             })
             .addCase(fetchHousingEstatesByRegion.rejected, (state, action) => {
                 state.loading = false;

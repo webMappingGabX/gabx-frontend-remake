@@ -83,19 +83,19 @@ const Header = () => {
             </div>
           ) : (
             <div className={`items-center gap-2 hidden md:flex`}>
-              <Button variant="ghost" size="icon" asChild>
+              <Button variant="ghost" asChild>
                 <Link to="/observations">
-                  <Binoculars className="w-5 h-5" />
+                  <Binoculars className="w-16 h-16" />
                 </Link>
               </Button>
               <Button variant="ghost" size="icon" asChild>
                 <Link to="/dashboard">
-                  <UserCog className="w-5 h-5" />
+                  <UserCog className="w-8 h-8" />
                 </Link>
               </Button>
               <Button variant="ghost" size="icon" asChild>
                 <Link to="/profile">
-                  <User className="w-5 h-5" />
+                  <User className="w-8 h-8" />
                 </Link>
               </Button>
               <Button

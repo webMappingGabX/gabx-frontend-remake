@@ -17,6 +17,10 @@ export interface User {
   username?: string;
   role: 'DEFAULT' | 'EXPERT' | 'ADMIN' | 'TENANT';
   profession: string;
+  status: string;
+  locationCode: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface AuthState {

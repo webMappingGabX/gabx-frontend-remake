@@ -21,6 +21,8 @@ import {
 import { Button } from "../ui/button";
 import { Card, CardContent } from "../ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
+import { useSelector } from "react-redux";
+import { selectCurrentPlot } from "../../app/store/slices/plotSlice";
 
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -29,10 +31,15 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-const DrawableLeafletMap = () => {
+const DrawableLeafletMap = ({
+  currentPlot
+}) => {
 
   const [currentEditionPoint, setCurrentEditionPoint] = useState(null);
   const [currentEditionFig, setCurrentEditionFig] = useState(null);
+  const [plotChange, setPlotChange] = useState(false);
+
+  //const currentPlot = useSelector(selectCurrentPlot);
 
   // State for marker position
   const [markerPos, setMarkerPos] = useState(
@@ -55,12 +62,120 @@ const DrawableLeafletMap = () => {
   const vertexMarkersRef = useRef([]);
   const geoJsonLayerRef = useRef(null);
   
+  const fitMapToGeometry = (geometry) => {
+    if (!geometry || !mapInstance.current) return;
+    
+    try {
+      let bounds = null;
+      
+      switch (geometry.type) {
+        case 'MultiPolygon':
+          // Créer des bounds à partir de tous les polygones
+          bounds = L.latLngBounds();
+          geometry.coordinates.forEach(polygonCoords => {
+            polygonCoords.forEach(ring => {
+              ring.forEach(coord => {
+                bounds.extend([coord[1], coord[0]]);
+              });
+            });
+          });
+          break;
+          
+        case 'Polygon':
+          bounds = L.latLngBounds();
+          geometry.coordinates[0].forEach(coord => {
+            bounds.extend([coord[1], coord[0]]);
+          });
+          break;
+          
+        case 'MultiLineString':
+          bounds = L.latLngBounds();
+          geometry.coordinates.forEach(lineCoords => {
+            lineCoords.forEach(coord => {
+              bounds.extend([coord[1], coord[0]]);
+            });
+          });
+          break;
+          
+        case 'LineString':
+          bounds = L.latLngBounds(geometry.coordinates.map(coord => [coord[1], coord[0]]));
+          break;
+          
+        case 'Point':
+          // Pour un point, centrer avec un zoom par défaut
+          mapInstance.current.setView([geometry.coordinates[1], geometry.coordinates[0]], 15);
+          return;
+          
+        default:
+          console.warn("Type de géométrie non supporté pour le centrage:", geometry.type);
+          return;
+      }
+      
+      // Vérifier que les bounds sont valides avant d'ajuster la vue
+      if (bounds && bounds.isValid()) {
+        mapInstance.current.fitBounds(bounds, { 
+          maxZoom: 18,
+          padding: [50, 50], // Padding pour mieux voir la géométrie
+          duration: 1 // Animation douce
+        });
+      }
+    } catch (error) {
+      console.error("Erreur lors du centrage de la carte:", error);
+    }
+  };
+
   // Draw currentEditionFig on the map if present
-  /* useEffect(() => {
+  useEffect(() => {
     console.log("MAP INSTANCE", mapInstance, "CURRENT EDITION FIG", currentEditionFig);
     if (!mapInstance.current) return;
 
-  }, [currentEditionFig]); */
+    if (currentEditionFig && mapInstance.current) {
+      // Petit délai pour s'assurer que les layers sont bien ajoutés
+      setTimeout(() => {
+        fitMapToGeometry(currentEditionFig);
+      }, 100);
+    }
+
+  }, [currentEditionFig]);
+
+  /*useEffect(() => {
+    // setCurrentEditionFig(currentPlot?.geom.geometries[0]);
+    setCurrentEditionFig(currentPlot?.geom.geometries[0]);
+  }, [currentPlot]);*/
+  useEffect(() => {
+    if (currentPlot?.geom) {
+      let geometryToDisplay = null;
+      
+      if (currentPlot.geom.type === "GeometryCollection" && currentPlot.geom.geometries) {
+        // Priorité des types de géométrie (du plus souhaité au moins souhaité)
+        const priorityOrder = ["MultiPolygon", "Polygon", "MultiLineString", "LineString", "Point"];
+        
+        // Chercher dans l'ordre de priorité
+        for (const geomType of priorityOrder) {
+          const foundGeometry = currentPlot.geom.geometries.find(geom => geom.type === geomType);
+          if (foundGeometry) {
+            geometryToDisplay = foundGeometry;
+            console.log(`Géométrie trouvée: ${geomType}`);
+            break;
+          }
+        }
+        
+        // Si rien trouvé mais qu'il y a des géométries, prendre la première
+        if (!geometryToDisplay && currentPlot.geom.geometries.length > 0) {
+          geometryToDisplay = currentPlot.geom.geometries[0];
+          console.warn("Aucune géométrie prioritaire trouvée, utilisation de:", geometryToDisplay.type);
+        }
+      } else {
+        // Cas où geom n'est pas une GeometryCollection
+        geometryToDisplay = currentPlot.geom;
+      }
+      
+      setCurrentEditionFig(geometryToDisplay);
+      setPlotChange(!plotChange);
+    } else {
+      setCurrentEditionFig(null);
+    }
+  }, [currentPlot]);
   
   // Fonction pour créer un marqueur de sommet
   const createVertexMarker = (latlng, parentLayer, index) => {
@@ -342,171 +457,299 @@ const DrawableLeafletMap = () => {
   useEffect(() => {
   if (!mapRef.current) return;
 
-  // Initialiser la carte seulement une fois
-  if (!mapInstance.current) {
-    mapInstance.current = L.map(mapRef.current, {
-      zoomControl: false
-    }).setView([
-      markerPos.lat == 0 ? 3.868177 : markerPos.lat, 
-      markerPos.lng == 0 ? 11.519596 : markerPos.lng
-    ], 12);
+    // Initialiser la carte seulement une fois
+    if (!mapInstance.current) {
+      mapInstance.current = L.map(mapRef.current, {
+        zoomControl: false
+      }).setView([
+        markerPos.lat == 0 ? 3.868177 : markerPos.lat, 
+        markerPos.lng == 0 ? 11.519596 : markerPos.lng
+      ], 12);
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    }).addTo(mapInstance.current);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      }).addTo(mapInstance.current);
 
-    // **SECTION MODIFIÉE** : Charger currentEditionFig comme entité modifiable
-    if (currentEditionFig) {
-      try {
-        // Fonction pour créer une couche Leaflet avec des marqueurs de sommets
-        const createEditableLayer = (coordinates, type) => {
-          const layers = [];
-          
-          coordinates.forEach((geomCoords, idx) => {
-            let latlngs;
-            if (type === 'MultiLineString') {
-              latlngs = geomCoords.map(coord => L.latLng(coord[1], coord[0]));
-            } else { // MultiPolygon
-              // Pour chaque polygone, prendre la première ring (exterior) et ignorer les autres (holes)
-              latlngs = geomCoords[0].map(coord => L.latLng(coord[1], coord[0]));
-              // Ne pas inclure le dernier point qui est une répétition du premier
-              latlngs = latlngs.slice(0, -1);
-            }
-
-            // Créer la couche Leaflet
-            let leafletLayer;
-            if (type === 'MultiLineString') {
-              leafletLayer = L.polyline(latlngs, { 
-                color: '#3B82F6', 
-                weight: 3 
-              }).addTo(mapInstance.current);
-            } else {
-              leafletLayer = L.polygon(latlngs, { 
-                color: '#3B82F6', 
-                weight: 3, 
-                fillOpacity: 0.2 
-              }).addTo(mapInstance.current);
-            }
-
-            // Créer les marqueurs de sommets
-            latlngs.forEach((latlng, index) => {
-              createVertexMarker(latlng, leafletLayer, index);
-            });
-
-            // Ajouter la possibilité d'ajouter des points en cliquant sur les segments
-            leafletLayer.on('click', function(e) {
-              // Vérifier si le clic provient d'un marqueur de sommet
-              const clickedOnVertex = vertexMarkersRef.current.some(marker => {
-                const markerLatLng = marker.getLatLng();
-                const clickLatLng = e.latlng;
-                const distance = Math.sqrt(
-                  Math.pow(markerLatLng.lat - clickLatLng.lat, 2) + 
-                  Math.pow(markerLatLng.lng - clickLatLng.lng, 2)
-                );
-                return distance < 0.001; // Seuil de tolérance
-              });
-              
-              if (clickedOnVertex) return;
-              
-              if (e.originalEvent) {
-                e.originalEvent.stopPropagation();
+      // **SECTION MODIFIÉE** : Charger currentEditionFig comme entité modifiable
+      if (currentEditionFig) {
+        try {
+          // Fonction pour créer une couche Leaflet avec des marqueurs de sommets
+          /* const createEditableLayer = (coordinates, type) => {
+            const layers = [];
+            
+            coordinates.forEach((geomCoords, idx) => {
+              let latlngs;
+              if (type === 'MultiLineString') {
+                latlngs = geomCoords.map(coord => L.latLng(coord[1], coord[0]));
+              } else { // MultiPolygon
+                // Pour chaque polygone, prendre la première ring (exterior) et ignorer les autres (holes)
+                latlngs = geomCoords[0].map(coord => L.latLng(coord[1], coord[0]));
+                // Ne pas inclure le dernier point qui est une répétition du premier
+                latlngs = latlngs.slice(0, -1);
               }
-              
-              const clickedPoint = e.latlng;
-              const currentPoints = leafletLayer.getLatLngs();
-              const points = Array.isArray(currentPoints[0]) ? currentPoints[0] : currentPoints;
-              
-              // Trouver le segment le plus proche du clic
-              let minDistance = Infinity;
-              let insertIndex = 1;
-              let closestPointOnSegment = null;
-              
-              for (let i = 0; i < points.length; i++) {
-                const nextIndex = (i + 1) % points.length;
+
+              // Créer la couche Leaflet
+              let leafletLayer;
+              if (type === 'MultiLineString') {
+                leafletLayer = L.polyline(latlngs, { 
+                  color: '#3B82F6', 
+                  weight: 3 
+                }).addTo(mapInstance.current);
+              } else {
+                leafletLayer = L.polygon(latlngs, { 
+                  color: '#3B82F6', 
+                  weight: 3, 
+                  fillOpacity: 0.2 
+                }).addTo(mapInstance.current);
+              }
+
+              // Créer les marqueurs de sommets
+              latlngs.forEach((latlng, index) => {
+                createVertexMarker(latlng, leafletLayer, index);
+              });
+
+              // Ajouter la possibilité d'ajouter des points en cliquant sur les segments
+              leafletLayer.on('click', function(e) {
+                // Vérifier si le clic provient d'un marqueur de sommet
+                const clickedOnVertex = vertexMarkersRef.current.some(marker => {
+                  const markerLatLng = marker.getLatLng();
+                  const clickLatLng = e.latlng;
+                  const distance = Math.sqrt(
+                    Math.pow(markerLatLng.lat - clickLatLng.lat, 2) + 
+                    Math.pow(markerLatLng.lng - clickLatLng.lng, 2)
+                  );
+                  return distance < 0.001; // Seuil de tolérance
+                });
                 
-                if (type === 'MultiLineString' && nextIndex === 0) continue;
+                if (clickedOnVertex) return;
                 
-                const segmentStart = points[i];
-                const segmentEnd = points[nextIndex];
+                if (e.originalEvent) {
+                  e.originalEvent.stopPropagation();
+                }
                 
-                const segmentVector = {
-                  lat: segmentEnd.lat - segmentStart.lat,
-                  lng: segmentEnd.lng - segmentStart.lng
-                };
+                const clickedPoint = e.latlng;
+                const currentPoints = leafletLayer.getLatLngs();
+                const points = Array.isArray(currentPoints[0]) ? currentPoints[0] : currentPoints;
                 
-                const clickVector = {
-                  lat: clickedPoint.lat - segmentStart.lat,
-                  lng: clickedPoint.lng - segmentStart.lng
-                };
+                // Trouver le segment le plus proche du clic
+                let minDistance = Infinity;
+                let insertIndex = 1;
+                let closestPointOnSegment = null;
                 
-                const segmentLengthSquared = segmentVector.lat * segmentVector.lat + segmentVector.lng * segmentVector.lng;
-                
-                if (segmentLengthSquared === 0) {
-                  const distance = Math.sqrt(clickVector.lat * clickVector.lat + clickVector.lng * clickVector.lng);
+                for (let i = 0; i < points.length; i++) {
+                  const nextIndex = (i + 1) % points.length;
+                  
+                  if (type === 'MultiLineString' && nextIndex === 0) continue;
+                  
+                  const segmentStart = points[i];
+                  const segmentEnd = points[nextIndex];
+                  
+                  const segmentVector = {
+                    lat: segmentEnd.lat - segmentStart.lat,
+                    lng: segmentEnd.lng - segmentStart.lng
+                  };
+                  
+                  const clickVector = {
+                    lat: clickedPoint.lat - segmentStart.lat,
+                    lng: clickedPoint.lng - segmentStart.lng
+                  };
+                  
+                  const segmentLengthSquared = segmentVector.lat * segmentVector.lat + segmentVector.lng * segmentVector.lng;
+                  
+                  if (segmentLengthSquared === 0) {
+                    const distance = Math.sqrt(clickVector.lat * clickVector.lat + clickVector.lng * clickVector.lng);
+                    if (distance < minDistance) {
+                      minDistance = distance;
+                      insertIndex = nextIndex;
+                      closestPointOnSegment = segmentStart;
+                    }
+                    continue;
+                  }
+                  
+                  const t = Math.max(0, Math.min(1, (clickVector.lat * segmentVector.lat + clickVector.lng * segmentVector.lng) / segmentLengthSquared));
+                  
+                  const closestPoint = {
+                    lat: segmentStart.lat + t * segmentVector.lat,
+                    lng: segmentStart.lng + t * segmentVector.lng
+                  };
+                  
+                  const distance = Math.sqrt(
+                    Math.pow(clickedPoint.lat - closestPoint.lat, 2) + 
+                    Math.pow(clickedPoint.lng - closestPoint.lng, 2)
+                  );
+                  
                   if (distance < minDistance) {
                     minDistance = distance;
                     insertIndex = nextIndex;
-                    closestPointOnSegment = segmentStart;
+                    closestPointOnSegment = closestPoint;
                   }
-                  continue;
                 }
                 
-                const t = Math.max(0, Math.min(1, (clickVector.lat * segmentVector.lat + clickVector.lng * segmentVector.lng) / segmentLengthSquared));
-                
-                const closestPoint = {
-                  lat: segmentStart.lat + t * segmentVector.lat,
-                  lng: segmentStart.lng + t * segmentVector.lng
-                };
-                
-                const distance = Math.sqrt(
-                  Math.pow(clickedPoint.lat - closestPoint.lat, 2) + 
-                  Math.pow(clickedPoint.lng - closestPoint.lng, 2)
-                );
-                
-                if (distance < minDistance) {
-                  minDistance = distance;
-                  insertIndex = nextIndex;
-                  closestPointOnSegment = closestPoint;
+                if (closestPointOnSegment) {
+                  addPointOnSegment(leafletLayer, insertIndex, L.latLng(closestPointOnSegment.lat, closestPointOnSegment.lng));
                 }
-              }
-              
-              if (closestPointOnSegment) {
-                addPointOnSegment(leafletLayer, insertIndex, L.latLng(closestPointOnSegment.lat, closestPointOnSegment.lng));
-              }
+              });
+
+              layers.push(leafletLayer);
             });
 
-            layers.push(leafletLayer);
-          });
+            return layers;
+          }; */
 
-          return layers;
-        };
+          console.log("LOAD ON MAP");
+          // Et dans la fonction createEditableLayer, ajoutez le support pour Point
+          const createEditableLayer = (geometry) => {
+            const layers = [];
+            
+            if (!geometry) {
+              console.error("Aucune géométrie à afficher");
+              return layers;
+            } else console.log("I AM TRYING TO DRAW GEOMETRY", geometry);
+            
+            // Gérer différents types de géométrie
+            switch (geometry.type) {
+              case 'MultiPolygon':
+                geometry.coordinates.forEach((polygonCoords, polygonIndex) => {
+                  polygonCoords.forEach((ring, ringIndex) => {
+                    if (ringIndex === 0) { // Anneau extérieur seulement
+                      const latlngs = ring.map(coord => L.latLng(coord[1], coord[0]));
+                      const leafletLayer = L.polygon(latlngs, { 
+                        color: '#3B82F6', 
+                        weight: 3, 
+                        fillOpacity: 0.2 
+                      }).addTo(mapInstance.current);
 
-        // Créer les couches en fonction du type de géométrie
-        let layers = [];
-        if (currentEditionFig.type === 'MultiLineString') {
-          layers = createEditableLayer(currentEditionFig.coordinates, 'MultiLineString');
-        } else if (currentEditionFig.type === 'MultiPolygon') {
-          layers = createEditableLayer(currentEditionFig.coordinates, 'MultiPolygon');
+                      latlngs.forEach((latlng, index) => {
+                        createVertexMarker(latlng, leafletLayer, index);
+                      });
+
+                      addSegmentClickHandler(leafletLayer, 'Polygon');
+                      layers.push(leafletLayer);
+                    }
+                  });
+                });
+                break;
+                
+              case 'Polygon':
+                const polyLatLngs = geometry.coordinates[0].map(coord => L.latLng(coord[1], coord[0]));
+                const polyLayer = L.polygon(polyLatLngs, { 
+                  color: '#3B82F6', 
+                  weight: 3, 
+                  fillOpacity: 0.2 
+                }).addTo(mapInstance.current);
+
+                polyLatLngs.forEach((latlng, index) => {
+                  createVertexMarker(latlng, polyLayer, index);
+                });
+
+                addSegmentClickHandler(polyLayer, 'Polygon');
+                layers.push(polyLayer);
+                break;
+                
+              case 'MultiLineString':
+                geometry.coordinates.forEach((lineCoords, lineIndex) => {
+                  const latlngs = lineCoords.map(coord => L.latLng(coord[1], coord[0]));
+                  const leafletLayer = L.polyline(latlngs, { 
+                    color: '#3B82F6', 
+                    weight: 3 
+                  }).addTo(mapInstance.current);
+
+                  latlngs.forEach((latlng, index) => {
+                    createVertexMarker(latlng, leafletLayer, index);
+                  });
+
+                  addSegmentClickHandler(leafletLayer, 'LineString');
+                  layers.push(leafletLayer);
+                });
+                break;
+                
+              case 'LineString':
+                const lineLatLngs = geometry.coordinates.map(coord => L.latLng(coord[1], coord[0]));
+                const lineLayer = L.polyline(lineLatLngs, { 
+                  color: '#3B82F6', 
+                  weight: 3 
+                }).addTo(mapInstance.current);
+
+                lineLatLngs.forEach((latlng, index) => {
+                  createVertexMarker(latlng, lineLayer, index);
+                });
+
+                addSegmentClickHandler(lineLayer, 'LineString');
+                layers.push(lineLayer);
+                break;
+                
+              case 'Point':
+                const pointLatLng = L.latLng(geometry.coordinates[1], geometry.coordinates[0]);
+                const marker = L.marker(pointLatLng, {
+                  icon: L.icon({
+                    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+                    iconSize: [25, 41],
+                    iconAnchor: [12, 41]
+                  })
+                }).addTo(mapInstance.current);
+                
+                // Pour les points, on peut créer un marqueur spécial éditable
+                const circleMarker = L.circleMarker(pointLatLng, {
+                  radius: 8,
+                  color: '#3B82F6',
+                  fillColor: '#3B82F6',
+                  fillOpacity: 0.8,
+                  weight: 2,
+                  draggable: true
+                }).addTo(mapInstance.current);
+                
+                circleMarker.parentLayer = circleMarker;
+                circleMarker.vertexIndex = 0;
+                
+                circleMarker.on('drag', function(e) {
+                  const newLatLng = e.target.getLatLng();
+                  marker.setLatLng(newLatLng);
+                  setMarkerPos({ lat: newLatLng.lat, lng: newLatLng.lng });
+                  setCurrentEditionPoint([newLatLng.lat, newLatLng.lng]);
+                });
+                
+                vertexMarkersRef.current.push(circleMarker);
+                layers.push(circleMarker);
+                layers.push(marker);
+                break;
+                
+              default:
+                console.warn("Type de géométrie non supporté:", geometry.type);
+            }
+
+            return layers;
+          };
+
+          // Créer les couches en fonction du type de géométrie
+          let layers = [];
+          if (currentEditionFig.type === 'MultiLineString') {
+            // layers = createEditableLayer(currentEditionFig.coordinates, 'MultiLineString');
+            layers = createEditableLayer(currentEditionFig);
+          } else if (currentEditionFig.type === 'MultiPolygon') {
+            console.log("LOAD MULTIPOLYGON");
+            // layers = createEditableLayer(currentEditionFig.coordinates, 'MultiPolygon');
+            layers = createEditableLayer(currentEditionFig);
+          }
+
+          // Stocker les couches créées
+          geoJsonLayerRef.current = L.layerGroup(layers).addTo(mapInstance.current);
+          
+          fitMapToGeometry(currentEditionFig);
+          // Ajuster la vue pour voir toutes les géométries
+          /*if (geoJsonLayerRef.current.getBounds && geoJsonLayerRef.current.getBounds().isValid()) {
+            mapInstance.current.fitBounds(geoJsonLayerRef.current.getBounds(), { maxZoom: 15 });
+          }*/
+        } catch (e) {
+          console.log("ERROR ADDING current fig", e);
         }
-
-        // Stocker les couches créées
-        geoJsonLayerRef.current = L.layerGroup(layers).addTo(mapInstance.current);
-        
-        // Ajuster la vue pour voir toutes les géométries
-        if (geoJsonLayerRef.current.getBounds && geoJsonLayerRef.current.getBounds().isValid()) {
-          mapInstance.current.fitBounds(geoJsonLayerRef.current.getBounds(), { maxZoom: 15 });
-        }
-      } catch (e) {
-        console.log("ERROR ADDING current fig", e);
       }
-    }
 
-    // Initialiser les contrôles de dessin
-    drawControlRef.current = new L.Control.Draw({
-      draw: false,
-      edit: false,
-    });
-    mapInstance.current.addControl(drawControlRef.current);
+      // Initialiser les contrôles de dessin
+      drawControlRef.current = new L.Control.Draw({
+        draw: false,
+        edit: false,
+      });
+      mapInstance.current.addControl(drawControlRef.current);
 
       mapInstance.current.on(L.Draw.Event.CREATED, function (e) {
         const layer = e.layer;
@@ -549,7 +792,7 @@ const DrawableLeafletMap = () => {
                 Math.pow(markerLatLng.lat - clickLatLng.lat, 2) + 
                 Math.pow(markerLatLng.lng - clickLatLng.lng, 2)
               );
-              return distance < 0.001; // Seuil de tolérance
+              return distance < 0.00001; // Seuil de tolérance
             });
             
             // Si le clic est sur un marqueur de sommet, ne pas ajouter de point
@@ -638,7 +881,106 @@ const DrawableLeafletMap = () => {
       }
     };
     // eslint-disable-next-line
-  }, []);
+  }, [plotChange]);
+
+  // Fonction helper pour ajouter le gestionnaire de clic sur les segments
+  const addSegmentClickHandler = (layer, type) => {
+    console.log("SEGMENT CLICKED VERTEX START");
+    layer.on('click', function(e) {
+      console.log("SEGMENT CLICKED VERTEX CLICKED HANDLER 0");
+      // Vérifier si le clic provient d'un marqueur de sommet
+      const clickedOnVertex = vertexMarkersRef.current.some(marker => {
+        const markerLatLng = marker.getLatLng();
+        const clickLatLng = e.latlng;
+        const distance = Math.sqrt(
+          Math.pow(markerLatLng.lat - clickLatLng.lat, 2) + 
+          Math.pow(markerLatLng.lng - clickLatLng.lng, 2)
+        );
+        console.log("DISTANCE :", distance);
+        //return distance < 0.001; // Seuil de tolérance
+        return distance < 0.00001; // Seuil de tolérance
+      });
+      console.log("SEGMENT CLICKED VERTEX CLICKED HANDLER 1 : ", clickedOnVertex);
+      // Si le clic est sur un marqueur de sommet, ne pas ajouter de point
+      if (clickedOnVertex) {
+        return;
+      }
+      console.log("SEGMENT CLICKED VERTEX CLICKED HANDLER");
+      if (e.originalEvent) {
+        e.originalEvent.stopPropagation();
+      }
+      
+      const clickedPoint = e.latlng;
+      const currentPoints = layer.getLatLngs();
+      const points = Array.isArray(currentPoints[0]) ? currentPoints[0] : currentPoints;
+      
+      // Trouver le segment le plus proche du clic
+      let minDistance = Infinity;
+      let insertIndex = 1;
+      let closestPointOnSegment = null;
+      
+      for (let i = 0; i < points.length; i++) {
+        const nextIndex = (i + 1) % points.length;
+        
+        // Pour les lignes, ne pas considérer le segment de fermeture
+        if (type === 'LineString' && nextIndex === 0) continue;
+        
+        const segmentStart = points[i];
+        const segmentEnd = points[nextIndex];
+        
+        // Calculer le point le plus proche sur le segment
+        const segmentVector = {
+          lat: segmentEnd.lat - segmentStart.lat,
+          lng: segmentEnd.lng - segmentStart.lng
+        };
+        
+        const clickVector = {
+          lat: clickedPoint.lat - segmentStart.lat,
+          lng: clickedPoint.lng - segmentStart.lng
+        };
+        
+        const segmentLengthSquared = segmentVector.lat * segmentVector.lat + segmentVector.lng * segmentVector.lng;
+        
+        if (segmentLengthSquared === 0) {
+          // Le segment est un point
+          const distance = Math.sqrt(clickVector.lat * clickVector.lat + clickVector.lng * clickVector.lng);
+          if (distance < minDistance) {
+            minDistance = distance;
+            insertIndex = nextIndex;
+            closestPointOnSegment = segmentStart;
+          }
+          continue;
+        }
+        
+        // Calculer la projection du point cliqué sur le segment
+        const t = Math.max(0, Math.min(1, (clickVector.lat * segmentVector.lat + clickVector.lng * segmentVector.lng) / segmentLengthSquared));
+        
+        const closestPoint = {
+          lat: segmentStart.lat + t * segmentVector.lat,
+          lng: segmentStart.lng + t * segmentVector.lng
+        };
+        
+        // Calculer la distance entre le point cliqué et le point projeté
+        const distance = Math.sqrt(
+          Math.pow(clickedPoint.lat - closestPoint.lat, 2) + 
+          Math.pow(clickedPoint.lng - closestPoint.lng, 2)
+        );
+        
+        if (distance < minDistance) {
+          minDistance = distance;
+          insertIndex = nextIndex;
+          closestPointOnSegment = closestPoint;
+        }
+      }
+      
+      console.log("SEGMENT CLICKED VERTEX END");
+      // Ajouter le point sur le segment (utiliser le point projeté sur le segment)
+      if (closestPointOnSegment) {
+        console.log("NEW VERTEX");
+        addPointOnSegment(layer, insertIndex, L.latLng(closestPointOnSegment.lat, closestPointOnSegment.lng));
+      }
+    });
+  };
 
   // Fonction pour calculer la distance d'un point à un segment (fallback si L.GeometryUtil n'est pas disponible)
   const calculateDistanceToSegment = (point, segmentStart, segmentEnd) => {
@@ -738,6 +1080,8 @@ const DrawableLeafletMap = () => {
       vertexMarkersRef.current = [];
       selectedMarkerRef.current = null;
     }
+
+    resetView();
   };
 
   // Fonction pour désélectionner le point actif et réactiver la navigation
@@ -785,7 +1129,8 @@ const DrawableLeafletMap = () => {
 
   return (
     <TooltipProvider>
-      <div className="relative flex flex-col h-full gap-4 p-4 rounded-lg bg-gray-50">
+      {/* <div className="relative flex flex-col h-full gap-4 p-4 rounded-lg bg-gray-50"> */}
+      <div className="relative flex flex-col h-auto gap-4 p-4 rounded-lg bg-gray-50">
         {/* En-tête */}
         <div className="flex items-center justify-between">
           <div>
@@ -858,6 +1203,21 @@ const DrawableLeafletMap = () => {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
+                    onClick={() => fitMapToGeometry(currentEditionFig)}
+                    variant="outline"
+                    className="flex flex-col items-center justify-center h-12 gap-1"
+                    disabled={!currentEditionFig}
+                  >
+                    <Navigation className="w-4 h-4" />
+                    <span className="text-xs">Centrer figure</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Centrer sur la figure actuelle</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
                     onClick={resetView}
                     size="icon"
                     className="w-10 h-10 text-gray-700 bg-white rounded-full shadow-md hover:bg-gray-50"
@@ -872,70 +1232,6 @@ const DrawableLeafletMap = () => {
 
           {/* Panneau de contrôle */}
           <div className="space-y-4 lg:w-80">
-            {/* Outils de dessin */}
-            <Card>
-              <CardContent className="p-4">
-                <h3 className="mb-3 font-medium text-gray-800">Outils de dessin</h3>
-                <div className="grid grid-cols-2 gap-2">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        onClick={handleDrawLine}
-                        variant="outline"
-                        className="flex flex-col items-center justify-center h-12 gap-1"
-                      >
-                        <div className="w-4 h-1 bg-current rounded-full"></div>
-                        <span className="text-xs">Ligne</span>
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Dessiner une ligne</TooltipContent>
-                  </Tooltip>
-
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        onClick={handleDrawPolygon}
-                        variant="outline"
-                        className="flex flex-col items-center justify-center h-12 gap-1"
-                      >
-                        <Square className="w-4 h-4" />
-                        <span className="text-xs">Polygone</span>
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Dessiner un polygone</TooltipContent>
-                  </Tooltip>
-
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        onClick={handleClearMap}
-                        variant="outline"
-                        className="flex flex-col items-center justify-center h-12 gap-1 text-red-600 border-red-200 hover:bg-red-50"
-                      >
-                        <Eraser className="w-4 h-4" />
-                        <span className="text-xs">Effacer tout</span>
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Effacer toutes les formes</TooltipContent>
-                  </Tooltip>
-                  
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        onClick={unselectMarker}
-                        variant="outline"
-                        className="flex flex-col items-center justify-center h-12 gap-1 text-gray-600 border-gray-200 hover:bg-gray-50"
-                      >
-                        <X className="w-4 h-4" />
-                        <span className="text-xs">Désélectionner</span>
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Désélectionner le point</TooltipContent>
-                  </Tooltip>
-                </div>
-              </CardContent>
-            </Card>
-
             {/* Coordonnées du point */}
             {selectedMarkerRef.current && (
               <Card className="border-blue-200 bg-blue-50">
@@ -1014,6 +1310,72 @@ const DrawableLeafletMap = () => {
                 </CardContent>
               </Card>
             )}
+
+            {/* Outils de dessin */}
+            <Card>
+              <CardContent className="p-4">
+                <h3 className="mb-3 font-medium text-gray-800">Outils de dessin</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        onClick={handleDrawLine}
+                        variant="outline"
+                        className="flex flex-col items-center justify-center h-12 gap-1"
+                      >
+                        <div className="w-4 h-1 bg-current rounded-full"></div>
+                        <span className="text-xs">Ligne</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Dessiner une ligne</TooltipContent>
+                  </Tooltip>
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        onClick={handleDrawPolygon}
+                        variant="outline"
+                        className="flex flex-col items-center justify-center h-12 gap-1"
+                      >
+                        <Square className="w-4 h-4" />
+                        <span className="text-xs">Polygone</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Dessiner un polygone</TooltipContent>
+                  </Tooltip>
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        onClick={handleClearMap}
+                        variant="outline"
+                        className="flex flex-col items-center justify-center h-12 gap-1 text-red-600 border-red-200 hover:bg-red-50"
+                      >
+                        <Eraser className="w-4 h-4" />
+                        <span className="text-xs">Effacer tout</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Effacer toutes les formes</TooltipContent>
+                  </Tooltip>
+                  
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        onClick={unselectMarker}
+                        variant="outline"
+                        className="flex flex-col items-center justify-center h-12 gap-1 text-gray-600 border-gray-200 hover:bg-gray-50"
+                      >
+                        <X className="w-4 h-4" />
+                        <span className="text-xs">Désélectionner</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Désélectionner le point</TooltipContent>
+                  </Tooltip>
+                </div>
+              </CardContent>
+            </Card>
+
+            
 
             {/* Statistiques */}
             <Card>

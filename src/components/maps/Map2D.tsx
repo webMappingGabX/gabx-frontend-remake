@@ -455,7 +455,8 @@ const Map2D = () => {
                 <Button size="sm" className="cursor-pointer" onClick={() => {
                   dispatch(setCurrentPlot(selectedParcelle));
                   
-                  navigate("/map/plot-edition");
+                  //navigate("/map/plot-edition", { state: { plotId: selectedParcelle.id } });
+                  navigate("/map/plot-edition", { state: { editingMode: true } });
                 }}>Modifier les infos</Button>
               </div>
             </CardContent>

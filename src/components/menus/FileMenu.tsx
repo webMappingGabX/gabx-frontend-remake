@@ -37,9 +37,9 @@ interface FeatureData {
     code: string;
     geom: Record<string, unknown>;
     region?: string;
-    city?: string;
+    town?: string;
     department?: string;
-    district?: string;
+    arrondissement?: string;
     place?: string;
     TFnumber?: string;
     acquiredYear?: number;
@@ -80,8 +80,8 @@ const FileMenu = () => {
             try {
             const response = await dispatch(getRegions());
 
-            console.log("LOADED REGIONS", response);
-            console.log("LOADED REGIONS FROM STATE", regionsFromState);
+            // console.log("LOADED REGIONS", response);
+            // console.log("LOADED REGIONS FROM STATE", regionsFromState);
             } catch (err) {
                 console.log("FAILED TO LOAD REGIONS", err);
             }
@@ -94,7 +94,7 @@ const FileMenu = () => {
         const loadDepts = async () => {
             const response = await dispatch(getDepts({ "regionId": housingEstateForm.region}));
 
-            console.log("LOADED DEPTS", response);
+            //console.log("LOADED DEPTS", response);
         }
 
         loadDepts();
@@ -104,7 +104,7 @@ const FileMenu = () => {
         const loadArronds = async () => {
             const response = await dispatch(getArronds({ "deptId": housingEstateForm.department }));
 
-            console.log("LOADED ARRONDS", response);
+            // console.log("LOADED ARRONDS", response);
         }
 
         loadArronds();
@@ -114,12 +114,16 @@ const FileMenu = () => {
         const loadTowns = async () => {
             const response = await dispatch(getTowns({ "arrondId": housingEstateForm.arrondissement }));
 
-            console.log("LOADED Towns", response);
-            console.log("LOADED Towns From state", townsFromStates);
+            // console.log("LOADED Towns", response);
+            // console.log("LOADED Towns From state", townsFromStates);
         }
 
         loadTowns();
     }, [housingEstateForm.arrondissement]);
+
+    /*useEffect(() => {
+        console.log("FORM DATAS", housingEstateForm);
+    }, [housingEstateForm])*/
 
     // Helper function to format file size
     const formatFileSize = (bytes: number): string => {
@@ -223,10 +227,10 @@ const FileMenu = () => {
                     const featureData: FeatureData = {
                         code: (properties.code as string) || generateUniqueCode(),
                         geom: convertToGeometryCollection(geometry as Record<string, unknown>),
-                        regionId: (properties.regionId as string) || undefined,
-                        townId: (properties.townId as string) || undefined,
-                        departmentId: (properties.departmentId as string) || undefined,
-                        arrondissementId: (properties.arrondissementId as string) || undefined,
+                        region: (properties.regionId as string) || undefined,
+                        town: (properties.townId as string) || undefined,
+                        department: (properties.departmentId as string) || undefined,
+                        arrondissement: (properties.arrondissementId as string) || undefined,
                         place: (properties.place as string) || undefined,
                         TFnumber: (properties.TFnumber as string) || (properties.tfnumber as string) || undefined,
                         acquiredYear: (properties.acquiredYear as number) || (properties.year as number) || undefined,
@@ -248,11 +252,12 @@ const FileMenu = () => {
             if (geometry) {
                 const featureData: FeatureData = {
                     code: (properties.code as string) || generateUniqueCode(),
-                    geom: convertToMultiPolygon(geometry as Record<string, unknown>),
-                    regionId: (properties.regionId as string) || undefined,
-                    townId: (properties.townId as string) || undefined,
-                    departmentId: (properties.departmentId as string) || undefined,
-                    arrondissementId: (properties.arrondissementId as string) || undefined,
+                    //geom: convertToMultiPolygon(geometry as Record<string, unknown>),
+                    geom: convertToGeometryCollection(geometry as Record<string, unknown>),
+                    region: (properties.regionId as string) || undefined,
+                    town: (properties.townId as string) || undefined,
+                    department: (properties.departmentId as string) || undefined,
+                    arrondissement: (properties.arrondissementId as string) || undefined,
                     place: (properties.place as string) || undefined,
                     TFnumber: (properties.TFnumber as string) || (properties.tfnumber as string) || undefined,
                     acquiredYear: (properties.acquiredYear as number) || (properties.year as number) || undefined,
@@ -312,11 +317,13 @@ const FileMenu = () => {
                 };
 
                 // Si un housing estate est spécifié, reporter ses attributs sur les features enfants
+                console.log("CREATED HOUSING ESTATE", housingEstateData);
+                
                 if (housingEstateId && housingEstateData) {
                     updatedFeature.regionId = housingEstateData.region || feature.region;
                     updatedFeature.departmentId = housingEstateData.department || feature.department;
-                    updatedFeature.arrondissementId = housingEstateData.arrondissement || feature.district;
-                    updatedFeature.townId = housingEstateData.town || feature.district;
+                    updatedFeature.arrondissementId = housingEstateData.arrondissement || feature.arrondissement;
+                    updatedFeature.townId = housingEstateData.town || feature.town;
                     updatedFeature.place = housingEstateData.place || feature.place;
                 }
 
@@ -549,7 +556,7 @@ const FileMenu = () => {
                                                                 handleHousingEstateFormChange('region', value)}
                                                         >
                                                             <SelectTrigger className="w-full">
-                                                                <SelectValue />
+                                                                <SelectValue placeholder="Sélectionnez une région" />
                                                             </SelectTrigger>
                                                             <SelectContent className="z-[1500] w-full">
                                                                 {regionsFromState?.map((region) => {
@@ -572,7 +579,7 @@ const FileMenu = () => {
                                                                 handleHousingEstateFormChange('department', value)}
                                                         >
                                                             <SelectTrigger className="w-full">
-                                                                <SelectValue />
+                                                                <SelectValue placeholder="Sélectionnez un département" />
                                                             </SelectTrigger>
                                                             <SelectContent className="z-[1500] w-full">
                                                                 {deptsFromStates?.map((dept) => {
@@ -591,17 +598,17 @@ const FileMenu = () => {
                                                     <div className="space-y-2">
                                                         <Label>District</Label>
                                                         <Select
-                                                            value={housingEstateForm.district}
+                                                            value={housingEstateForm.arrondissement}
                                                             onValueChange={(value) => 
-                                                                handleHousingEstateFormChange('district', value)}
+                                                                handleHousingEstateFormChange('arrondissement', value)}
                                                         >
                                                             <SelectTrigger className="w-full">
-                                                                <SelectValue />
+                                                                <SelectValue placeholder="Sélectionnez un arrondissement" />
                                                             </SelectTrigger>
                                                             <SelectContent className="z-[1500] w-full">
-                                                                {districtsFromStates?.map((district) => {
+                                                                {districtsFromStates?.map((arrondissement) => {
                                                                     return (
-                                                                        <SelectItem key={district.id} value={district?.id} >{district?.name}</SelectItem>
+                                                                        <SelectItem key={arrondissement.id} value={arrondissement?.id} >{arrondissement?.name}</SelectItem>
                                                                     );
                                                                 })}
                                                             </SelectContent>
@@ -615,12 +622,12 @@ const FileMenu = () => {
                                                     <div className="space-y-2">
                                                         <Label>Ville</Label>
                                                         <Select
-                                                            value={housingEstateForm.city}
+                                                            value={housingEstateForm.town}
                                                             onValueChange={(value) => 
-                                                                handleHousingEstateFormChange('city', value)}
+                                                                handleHousingEstateFormChange('town', value)}
                                                         >
                                                             <SelectTrigger className="w-full">
-                                                                <SelectValue />
+                                                                <SelectValue placeholder="Sélectionnez une ville" />
                                                             </SelectTrigger>
                                                             <SelectContent className="z-[1500] w-full">
                                                                 {Array.isArray(townsFromStates) && townsFromStates?.map((town) => {
