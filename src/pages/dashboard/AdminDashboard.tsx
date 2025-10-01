@@ -265,7 +265,7 @@ const AdminDashboard = () => {
     <div className="space-y-6">
       {/* Welcome banner */}
       <div className="p-6 text-white rounded-lg bg-gradient-to-r from-blue-600 to-purple-600">
-        <h2 className="mb-2 text-2xl font-bold">Bienvenue dans l'administration GabX</h2>
+        <h2 className="mb-2 text-2xl font-bold">Bienvenue dans l'administration SIC MAP VIEW</h2>
         <p className="opacity-90">Gérez vos utilisateurs, observations et données cartographiques en temps réel.</p>
       </div>
 

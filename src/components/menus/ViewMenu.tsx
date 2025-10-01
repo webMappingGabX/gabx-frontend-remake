@@ -1,489 +1,138 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent } from "../ui/card";
 import { Button } from "../ui/button";
-import { Download, File, X, Save, Building } from "lucide-react";
-import { closeMenu } from "../../app/store/slices/settingSlice";
+import { Search, Eye, X, Filter, MapPin, Home, Building } from "lucide-react";
+import { closeMenu, selectOverlaps, selectSearch, toggleOverlaps, toggleSearch } from "../../app/store/slices/settingSlice";
 import { useDispatch, useSelector } from "react-redux";
 import { useToast } from "../../hooks/useToast";
 import { useEffect, useState } from "react";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
-import { createHousingEstate } from "../../app/store/slices/housingEstateSlice";
-import { createPlot } from "../../app/store/slices/plotSlice";
-import { getArronds, getDepts, getRegions, getTowns, selectArrondState, selectDeptState, selectRegionsState, selectTokens, selectTownsState } from "../../app/store/slices/authSlice";
+import { Badge } from "../ui/badge";
+import { Switch } from "../ui/switch";
 
-interface GeoJsonInformations {
-    name: string;
-    size: number;
-    type: string;
-    featureCount: number;
-    geometryTypesText: string;
-    propertiesText: string;
-    crs: string;
+interface SearchFilters {
+  region: string;
+  department: string;
+  arrondissement: string;
+  town: string;
+  housingEstate: string;
+  propertyType: string;
+  status: string;
 }
 
-interface HousingEstateFormData {
-    name: string;
-    region: string;
-    town: string;
-    department: string;
-    arrondissement: string;
-    place: string;
-    buildingsType: 'COLLECTIVE' | 'INDIVIDUAL';
-}
-
-interface FeatureData {
-    code: string;
-    geom: Record<string, unknown>;
-    region?: string;
-    city?: string;
-    department?: string;
-    district?: string;
-    place?: string;
-    TFnumber?: string;
-    acquiredYear?: number;
-    classification?: number;
-    area?: number;
-    price?: number;
-    marketValue?: number;
-    observations?: string;
-    status?: "BATI" | "NON BATI";
-    housingEstateId?: number;
-}
-
-const FileMenu = () => {
+const ViewMenu = () => {
     const dispatch = useDispatch();
     const { toast } = useToast();
-    const [importedFile, setImportedFile] = useState<GeoJsonInformations | null>(null);
-    const [geojsonData, setGeojsonData] = useState<Record<string, unknown> | null>(null);
-    const [showHousingEstateForm, setShowHousingEstateForm] = useState(false);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [housingEstateForm, setHousingEstateForm] = useState<HousingEstateFormData>({
-        name: "",
-        region: '',
-        town: '',
-        department: '',
-        arrondissement: '',
-        place: '',
-        buildingsType: 'COLLECTIVE'
+
+    const [searchFilters, setSearchFilters] = useState<SearchFilters>({
+      region: '',
+      department: '',
+      arrondissement: '',
+      town: '',
+      housingEstate: '',
+      propertyType: '',
+      status: ''
     });
 
-    const regionsFromState = useSelector(selectRegionsState);
-    const deptsFromStates = useSelector(selectDeptState);
-    const districtsFromStates = useSelector(selectArrondState);
-    const townsFromStates = useSelector(selectTownsState);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [overlappingAreas, setOverlappingAreas] = useState<any[]>([]);
 
-    // Use Effect
+    const selectSearchFromState = useSelector(selectSearch);
+    const selectOverlapsFromState = useSelector(selectOverlaps);
+
+    // Données simulées pour les empiètements
+    const mockOverlappingAreas = [
+      {
+        id: 1,
+        properties: ["PROP_001", "PROP_002"],
+        area: 150.5,
+        severity: "HIGH",
+        location: "Zone Nord",
+        coordinates: []
+      },
+      {
+        id: 2,
+        properties: ["PROP_003", "PROP_004", "PROP_005"],
+        area: 75.2,
+        severity: "MEDIUM",
+        location: "Zone Sud",
+        coordinates: []
+      },
+      {
+        id: 3,
+        properties: ["PROP_006", "PROP_007"],
+        area: 210.8,
+        severity: "LOW",
+        location: "Zone Est",
+        coordinates: []
+      }
+    ];
+
+    // Charger les empiètements au montage
     useEffect(() => {
-        const loadRegions = async () => {
-            try {
-            const response = await dispatch(getRegions());
-
-            console.log("LOADED REGIONS", response);
-            console.log("LOADED REGIONS FROM STATE", regionsFromState);
-            } catch (err) {
-                console.log("FAILED TO LOAD REGIONS", err);
-            }
-        }
-
-        loadRegions();
+      // Simuler le chargement des données d'empiètement
+      setOverlappingAreas(mockOverlappingAreas);
     }, []);
 
-    useEffect(() => {
-        const loadDepts = async () => {
-            const response = await dispatch(getDepts({ "regionId": housingEstateForm.region}));
+    // Gestion des options d'affichage
+    const handleViewOverlapChange = () => {
+        dispatch(toggleOverlaps());
+    }
 
-            console.log("LOADED DEPTS", response);
-        }
+    /*useEffect(() => {
+        toast({
+            title: "Affichage mis à jour",
+            description: `Option Afficher les empiètement ${selectOverlapsFromState ? 'activée' : 'désactivée'}`,
+            variant: "default"
+        });
+    }, [selectOverlapsFromState])*/
 
-        loadDepts();
-    }, [housingEstateForm.region]);
+    
+    const handleViewSearchChange = () => {
+        dispatch(toggleSearch());
+    }
 
-    useEffect(() => {
-        const loadArronds = async () => {
-            const response = await dispatch(getArronds({ "deptId": housingEstateForm.department }));
+    /*useEffect(() => {
+        toast({
+            title: "Affichage mis à jour",
+            description: `Option Afficher la zone de recherche ${selectSearchFromState ? 'activée' : 'désactivée'}`,
+            variant: "default"
+        });
+    }, [selectSearchFromState])*/
 
-            console.log("LOADED ARRONDS", response);
-        }
 
-        loadArronds();
-    }, [housingEstateForm.department]);
+    // Afficher les détails d'un empiètement
+    const handleShowOverlapDetails = (overlap: any) => {
+      toast({
+        title: `Empiètement #${overlap.id}`,
+        description: `${overlap.properties.length} propriétés concernées - ${overlap.area}m²`,
+        variant: "default"
+      });
 
-    useEffect(() => {
-        const loadTowns = async () => {
-            const response = await dispatch(getTowns({ "arrondId": housingEstateForm.district }));
-
-            console.log("LOADED Towns", response);
-            console.log("LOADED Towns From state", townsFromStates);
-        }
-
-        loadTowns();
-    }, [housingEstateForm.district]);
-
-    // Helper function to format file size
-    const formatFileSize = (bytes: number): string => {
-        if (bytes === 0) return '0 Bytes';
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+      // Ici, vous pourriez zoomer sur la zone d'empiètement
+      console.log("Focus on overlap:", overlap);
     };
 
-    // Helper function to analyze GeoJSON structure
-    const analyzeGeoJSON = (geojson: Record<string, unknown>) => {
-        const info = {
-            type: geojson.type || 'Unknown',
-            featureCount: 0,
-            geometryTypes: new Set<string>(),
-            properties: new Set<string>(),
-            bounds: null as unknown
-        };
-
-        if (geojson.type === 'FeatureCollection' && Array.isArray(geojson.features)) {
-            info.featureCount = geojson.features.length;
-            
-            geojson.features.forEach((feature: Record<string, unknown>) => {
-                const geometry = feature.geometry as Record<string, unknown>;
-                const properties = feature.properties as Record<string, unknown>;
-                
-                if (geometry && geometry.type) {
-                    info.geometryTypes.add(geometry.type as string);
-                }
-                if (properties) {
-                    Object.keys(properties).forEach(prop => info.properties.add(prop));
-                }
-            });
-        } else if (geojson.type === 'Feature') {
-            info.featureCount = 1;
-            const geometry = geojson.geometry as Record<string, unknown>;
-            const properties = geojson.properties as Record<string, unknown>;
-            
-            if (geometry && geometry.type) {
-                info.geometryTypes.add(geometry.type as string);
-            }
-            if (properties) {
-                Object.keys(properties).forEach(prop => info.properties.add(prop));
-            }
-        }
-
-        return info;
+    // Obtenir la couleur de sévérité
+    const getSeverityColor = (severity: string) => {
+      switch (severity) {
+        case "HIGH": return "bg-red-500";
+        case "MEDIUM": return "bg-orange-500";
+        case "LOW": return "bg-yellow-500";
+        default: return "bg-gray-500";
+      }
     };
 
-    // Fonction pour générer un code unique
-    const generateUniqueCode = (): string => {
-        const timestamp = Date.now().toString(36);
-        const randomStr = Math.random().toString(36).substring(2, 8);
-        return `PROP_${timestamp}_${randomStr}`.toUpperCase();
-    };
-
-    // Fonction pour convertir Polygon en MultiPolygon
-    /* const convertToMultiPolygon = (geometry: Record<string, unknown>): Record<string, unknown> => {
-        if (geometry.type === 'Polygon') {
-            return {
-                type: 'MultiPolygon',
-                coordinates: [geometry.coordinates]
-            };
-        }
-        if (geometry.type === 'MultiPolygon') {
-            return geometry;
-        }
-        throw new Error(`Type de géométrie non supporté: ${geometry.type}`);
-    }; */
-
-    // Fonction de conversion en GeometryCollection
-    //const convertToMultiPolygon = (geometry: Record<string, unknown>): Record<string, unknown> => {
-    //const convertToGeometryCollection = (geometry: Record<string, unknown>): Record<string, unknown> => {
-    const convertToGeometryCollection = (geometry: Record<string, unknown>): Record<string, unknown> => {
-        // Convert any geometry to a GeometryCollection
-        if (!geometry) {
-            throw new Error("Aucune géométrie fournie");
-        }
-        // If already a GeometryCollection, return as is
-        if (geometry.type === 'GeometryCollection') {
-            return geometry;
-        }
-        // Otherwise, wrap the geometry in a GeometryCollection
-        return {
-            type: 'GeometryCollection',
-            geometries: [geometry]
-        };
-    };
-
-    // Fonction pour extraire les données des features
-    const extractFeaturesData = (geojson: Record<string, unknown>): FeatureData[] => {
-        const features: FeatureData[] = [];
-        
-        if (geojson.type === 'FeatureCollection' && Array.isArray(geojson.features)) {
-            geojson.features.forEach((feature: Record<string, unknown>) => {
-                const properties = (feature.properties as Record<string, unknown>) || {};
-                const geometry = feature.geometry;
-                
-                if (geometry) {
-                    const featureData: FeatureData = {
-                        code: (properties.code as string) || generateUniqueCode(),
-                        geom: convertToGeometryCollection(geometry as Record<string, unknown>),
-                        regionId: (properties.regionId as string) || undefined,
-                        townId: (properties.townId as string) || undefined,
-                        departmentId: (properties.departmentId as string) || undefined,
-                        arrondissementId: (properties.arrondissementId as string) || undefined,
-                        place: (properties.place as string) || undefined,
-                        TFnumber: (properties.TFnumber as string) || (properties.tfnumber as string) || undefined,
-                        acquiredYear: (properties.acquiredYear as number) || (properties.year as number) || undefined,
-                        classification: (properties.classification as number) || undefined,
-                        area: (properties.area as number) || undefined,
-                        price: (properties.price as number) || undefined,
-                        marketValue: (properties.marketValue as number) || (properties.market_value as number) || undefined,
-                        observations: (properties.observations as string) || undefined,
-                        status: (properties.status as "BATI" | "NON BATI") || undefined,
-                        housingEstateId: undefined
-                    };
-                    features.push(featureData);
-                }
-            });
-        } else if (geojson.type === 'Feature') {
-            const properties = (geojson.properties as Record<string, unknown>) || {};
-            const geometry = geojson.geometry;
-            
-            if (geometry) {
-                const featureData: FeatureData = {
-                    code: (properties.code as string) || generateUniqueCode(),
-                    geom: convertToMultiPolygon(geometry as Record<string, unknown>),
-                    regionId: (properties.regionId as string) || undefined,
-                    townId: (properties.townId as string) || undefined,
-                    departmentId: (properties.departmentId as string) || undefined,
-                    arrondissementId: (properties.arrondissementId as string) || undefined,
-                    place: (properties.place as string) || undefined,
-                    TFnumber: (properties.TFnumber as string) || (properties.tfnumber as string) || undefined,
-                    acquiredYear: (properties.acquiredYear as number) || (properties.year as number) || undefined,
-                    classification: (properties.classification as number) || undefined,
-                    area: (properties.area as number) || undefined,
-                    price: (properties.price as number) || undefined,
-                    marketValue: (properties.marketValue as number) || (properties.market_value as number) || undefined,
-                    observations: (properties.observations as string) || undefined,
-                    status: (properties.status as "BATI" | "NON BATI") || undefined,
-                    housingEstateId: undefined
-                };
-                features.push(featureData);
-            }
-        }
-        
-        return features;
-    };
-
-    // Fonction pour créer un housing estate via l'API
-    const createHE = async (formData: HousingEstateFormData): Promise<string | null> => {
-        try {
-            const datas = {
-                ...formData,
-                regionId: formData.region,
-                departmentId: formData.department,
-                arrondissementId: formData.arrondissement,
-                townId: formData.town
-            }
-            const response = await dispatch(createHousingEstate(datas));
-            
-            if(response.type.includes("rejected"))
-            {
-                throw new Error('Erreur lors de l\'envoi des données');
-            }
-
-            return (response.payload as { housingEstate: { id: string } }).housingEstate.id;
-        } catch (error) {
-            console.error('Erreur:', error);
-            toast({
-                title: "Erreur",
-                description: "Impossible de créer la cité",
-                variant: "destructive"
-            });
-            return null;
-        }
-    };
-
-    // Fonction pour envoyer les features à l'API
-    const sendFeaturesToAPI = async (features: FeatureData[], housingEstateId: string | null = null, housingEstateData: HousingEstateFormData | null = null) => {
-        try {
-            const results = [];
-            
-            for (const feature of features) {
-                const updatedFeature = {
-                    ...feature,
-                    housingEstateId: housingEstateId ? parseInt(housingEstateId) : feature.housingEstateId
-                };
-
-                // Si un housing estate est spécifié, reporter ses attributs sur les features enfants
-                if (housingEstateId && housingEstateData) {
-                    updatedFeature.regionId = housingEstateData.region || feature.region;
-                    updatedFeature.departmentId = housingEstateData.department || feature.department;
-                    updatedFeature.arrondissementId = housingEstateData.arrondissement || feature.district;
-                    updatedFeature.townId = housingEstateData.town || feature.district;
-                    updatedFeature.place = housingEstateData.place || feature.place;
-                }
-
-                const response = await dispatch(createPlot(updatedFeature));
-                
-                if(response.type.includes("rejected"))
-                {
-                    throw new Error('Erreur lors de l\'envoi des données');
-                }
-
-                results.push(response.payload);
-            }
-
-            return results;
-
-            /*const response = await fetch('/api/features', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(featuresToSend)
-            });
-
-            if (!response.ok) {
-                throw new Error('Erreur lors de l\'envoi des données');
-            }
-
-            return await response.json();*/
-        } catch (error) {
-            console.error('Erreur lors de l\'envoi des features:', error);
-            throw error;
-        }
-    };
-
-    // Fonction pour sauvegarder les données
-    const handleSaveData = async () => {
-        if (!geojsonData) return;
-
-        setIsSubmitting(true);
-        try {
-            const features = extractFeaturesData(geojsonData);
-            let housingEstateId: string | null = null;
-
-            // Si le formulaire housing estate est rempli, on le crée d'abord
-            if (showHousingEstateForm && 
-                (housingEstateForm.region || housingEstateForm.town || housingEstateForm.department)) {
-                
-                housingEstateId = await createHE(housingEstateForm);
-                if (!housingEstateId) {
-                    setIsSubmitting(false);
-                    return;
-                }
-            }
-
-            // Envoi des features à l'API
-            await sendFeaturesToAPI(features, housingEstateId, showHousingEstateForm ? housingEstateForm : null);
-            
-            toast({
-                title: "Succès",
-                description: `${features.length} feature(s) ont été sauvegardées avec succès`,
-                variant: "default"
-            });
-
-            // Réinitialiser l'état
-            setImportedFile(null);
-            setGeojsonData(null);
-            setShowHousingEstateForm(false);
-            setHousingEstateForm({
-                name: '',
-                region: '',
-                town: '',
-                department: '',
-                arrondissement: '',
-                place: '',
-                buildingsType: 'COLLECTIVE'
-            });
-
-        } catch (error) {
-            console.log("ERROR", error);
-            toast({
-                title: "Erreur",
-                description: "Une erreur est survenue lors de la sauvegarde",
-                variant: "destructive"
-            });
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
-
-    const handleImportGeoJson = () => {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.geojson,application/geo+json,application/json';
-        input.onchange = (e: Event) => {
-            const target = e.target as HTMLInputElement;
-            const file = target.files?.[0];
-            if (file) {
-                const maxSize = 7 * 1024 * 1024;
-                if (file.size > maxSize) {
-                    toast({
-                        title: "Fichier trop volumineux",
-                        description: `Le fichier fait ${formatFileSize(file.size)}. La taille maximale autorisée est de 7 MB.`,
-                        variant: "destructive"
-                    });
-                    return;
-                }
-
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    try {
-                        const result = event.target?.result;
-                        if (typeof result !== 'string') {
-                            throw new Error('Invalid file content');
-                        }
-                        const geojson = JSON.parse(result);
-                        
-                        if (!geojson.type || !['Feature', 'FeatureCollection', 'Geometry'].includes(geojson.type)) {
-                            toast({
-                                title: "Format GeoJSON invalide",
-                                description: "Le fichier ne semble pas être un GeoJSON valide.",
-                                variant: "destructive"
-                            });
-                            return;
-                        }
-
-                        const analysis = analyzeGeoJSON(geojson);
-                        const geometryTypesText = Array.from(analysis.geometryTypes).join(', ') || 'Aucun';
-                        const propertiesText = Array.from(analysis.properties).slice(0, 5).join(', ') + 
-                            (analysis.properties.size > 5 ? ` (+${analysis.properties.size - 5} autres)` : '');
-
-                        setImportedFile({
-                            name: file.name,
-                            size: file.size,
-                            type: analysis.type,
-                            featureCount: analysis.featureCount,
-                            geometryTypesText,
-                            propertiesText,
-                            crs: (geojson.crs as { properties?: { name?: string } })?.properties?.name || "Inconnu"
-                        });
-
-                        setGeojsonData(geojson);
-                        
-                        toast({
-                            title: "GeoJSON importé avec succès !",
-                            description: `Prêt à sauvegarder ${analysis.featureCount} feature(s)`
-                        });
-
-                    } catch (error) {
-                        console.error('Erreur lors de l\'import:', error);
-                        toast({
-                            title: "Erreur lors de l'import",
-                            description: "Le fichier n'est pas un JSON valide ou n'est pas un GeoJSON correct.",
-                            variant: "destructive"
-                        });
-                    }
-                };
-                reader.readAsText(file);
-            }
-        };
-        input.click();
-    };
-
-    const handleHousingEstateFormChange = (field: keyof HousingEstateFormData, value: string) => {
-        setHousingEstateForm(prev => ({
-            ...prev,
-            [field]: value
-        }));
+    // Obtenir le texte de sévérité
+    const getSeverityText = (severity: string) => {
+      switch (severity) {
+        case "HIGH": return "Élevé";
+        case "MEDIUM": return "Moyen";
+        case "LOW": return "Faible";
+        default: return "Inconnu";
+      }
     };
 
     return (
@@ -492,11 +141,11 @@ const FileMenu = () => {
                 initial={{ opacity: 0, y: 100 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 0 }}
-                className="absolute z-[1100] md:max-w-xl md:min-w-sm md:w-auto w-[90%] bottom-4 left-1/2 -translate-x-1/2 max-h-[400px]"
+                className="absolute z-[1100] md:max-w-xl md:min-w-sm md:w-auto w-[90%] bottom-4 left-1/2 -translate-x-1/2 max-h-[500px]"
             >
                 <Card className="py-2">
                     <CardContent className="p-4">
-                        <div className="flex flex-col items-start justify-between max-h-[300px] overflow-y-auto">
+                        <div className="flex flex-col items-start justify-between max-h-[450px] overflow-y-auto">
                             <h1 className="relative flex flex-row items-center w-full mb-4 font-bold text-gray-500">
                                 <Button 
                                     className="absolute flex items-center justify-center font-bold text-black bg-transparent shadow-none cursor-pointer right-2 hover:bg-gray-300/90"
@@ -504,184 +153,98 @@ const FileMenu = () => {
                                 >
                                     <X className="w-4 h-4" />
                                 </Button>
-                                <File className="w-4 h-4 mr-2" />
-                                FILE MENU
+                                <Eye className="w-4 h-4 mr-2" />
+                                VIEW MENU
                             </h1>
-                            <div className="w-full overflow-auto ">
-                                {importedFile ? (
-                                    <div className="mb-4">
-                                        <h2 className="mb-2 font-semibold text-md">Informations du fichier importé</h2>
-                                        <ul className="text-sm text-gray-700 dark:text-gray-300">
-                                            <li><span className="font-medium">Nom:</span> {importedFile.name}</li>
-                                            <li><span className="font-medium">Taille:</span> {formatFileSize(importedFile.size)}</li>
-                                            <li><span className="font-medium">Type:</span> {importedFile.type}</li>
-                                            <li><span className="font-medium">Features:</span> {importedFile.featureCount}</li>
-                                            <li><span className="font-medium">CRS:</span> {importedFile.crs || "Inconnu"}</li>
-                                        </ul>
+                            
+                            <div className="w-full space-y-4">
 
-                                        <Button
-                                            variant="outline"
-                                            className="mt-2 cursor-pointer"
-                                            onClick={() => setShowHousingEstateForm(!showHousingEstateForm)}
-                                        >
-                                            <Building className="w-4 h-4 mr-2" />
-                                            {showHousingEstateForm ? 'Masquer X' : 'Ajouter à une cité'}
-                                        </Button>
-
-                                        {showHousingEstateForm && (
-                                            <div className="p-4 mt-4 border rounded-md">
-                                                <h3 className="mb-3 font-semibold">Informations sur la cité</h3>
-                                                <div className="grid grid-cols-1 gap-3 mb-2">
-                                                    <div className="space-y-2">
-                                                        <Label>Nom</Label>
-                                                        <Input
-                                                            value={housingEstateForm.name}
-                                                            onChange={(e) => handleHousingEstateFormChange('name', e.target.value)}
-                                                        />
-                                                    </div>
-                                                </div>
-                                                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                                    <div className="space-y-2">
-                                                        <Label>Région</Label>
-                                                        <Select
-                                                            value={housingEstateForm.region}
-                                                            onValueChange={(value) => 
-                                                                handleHousingEstateFormChange('region', value)}
-                                                        >
-                                                            <SelectTrigger className="w-full">
-                                                                <SelectValue />
-                                                            </SelectTrigger>
-                                                            <SelectContent className="z-[1500] w-full">
-                                                                {regionsFromState?.map((region) => {
-                                                                    return (
-                                                                        <SelectItem key={region?.id} value={region?.id} >{region?.name}</SelectItem>
-                                                                    );
-                                                                })}
-                                                            </SelectContent>
-                                                        </Select>
-                                                        {/*<Input
-                                                            value={housingEstateForm.region}
-                                                            onChange={(e) => handleHousingEstateFormChange('region', e.target.value)}
-                                                        />*/}
-                                                    </div>
-                                                    <div className="space-y-2">
-                                                        <Label>Département</Label>
-                                                        <Select
-                                                            value={housingEstateForm.department}
-                                                            onValueChange={(value) => 
-                                                                handleHousingEstateFormChange('department', value)}
-                                                        >
-                                                            <SelectTrigger className="w-full">
-                                                                <SelectValue />
-                                                            </SelectTrigger>
-                                                            <SelectContent className="z-[1500] w-full">
-                                                                {deptsFromStates?.map((dept) => {
-                                                                    return (
-                                                                        <SelectItem key={dept.id} value={dept?.id} >{dept?.name}</SelectItem>
-                                                                    );
-                                                                })}
-                                                            </SelectContent>
-                                                        </Select>
-                                                        {/*<Input
-                                                            value={housingEstateForm.department}
-                                                            onChange={(e) => handleHousingEstateFormChange('department', e.target.value)}
-                                                        />*/}
-                                                    </div>
-
-                                                    <div className="space-y-2">
-                                                        <Label>District</Label>
-                                                        <Select
-                                                            value={housingEstateForm.district}
-                                                            onValueChange={(value) => 
-                                                                handleHousingEstateFormChange('district', value)}
-                                                        >
-                                                            <SelectTrigger className="w-full">
-                                                                <SelectValue />
-                                                            </SelectTrigger>
-                                                            <SelectContent className="z-[1500] w-full">
-                                                                {districtsFromStates?.map((district) => {
-                                                                    return (
-                                                                        <SelectItem key={district.id} value={district?.id} >{district?.name}</SelectItem>
-                                                                    );
-                                                                })}
-                                                            </SelectContent>
-                                                        </Select>
-                                                        {/*<Input
-                                                            value={housingEstateForm.district}
-                                                            onChange={(e) => handleHousingEstateFormChange('district', e.target.value)}
-                                                        />*/}
-                                                    </div>
-
-                                                    <div className="space-y-2">
-                                                        <Label>Ville</Label>
-                                                        <Select
-                                                            value={housingEstateForm.city}
-                                                            onValueChange={(value) => 
-                                                                handleHousingEstateFormChange('city', value)}
-                                                        >
-                                                            <SelectTrigger className="w-full">
-                                                                <SelectValue />
-                                                            </SelectTrigger>
-                                                            <SelectContent className="z-[1500] w-full">
-                                                                {Array.isArray(townsFromStates) && townsFromStates?.map((town) => {
-                                                                    return (
-                                                                        <SelectItem key={town?.id} value={town?.id} >{town?.name}</SelectItem>
-                                                                    );
-                                                                })}
-                                                            </SelectContent>
-                                                        </Select>
-                                                        {/*<Input
-                                                            value={housingEstateForm.city}
-                                                            onChange={(e) => handleHousingEstateFormChange('city', e.target.value)}
-                                                        />*/}
-                                                    </div>
-                                                    
-                                                    <div className="space-y-2">
-                                                        <Label>Lieu</Label>
-                                                        <Input
-                                                            value={housingEstateForm.place}
-                                                            onChange={(e) => handleHousingEstateFormChange('place', e.target.value)}
-                                                        />
-                                                    </div>
-                                                    <div className="space-y-2">
-                                                        <Label>Type de bâtiment</Label>
-                                                        <Select
-                                                            value={housingEstateForm.buildingsType}
-                                                            onValueChange={(value: 'COLLECTIVE' | 'INDIVIDUAL') => 
-                                                                handleHousingEstateFormChange('buildingsType', value)}
-                                                        >
-                                                            <SelectTrigger className="w-full">
-                                                                <SelectValue />
-                                                            </SelectTrigger>
-                                                            <SelectContent className="z-[1500] w-full">
-                                                                <SelectItem value="COLLECTIVE">Collectif</SelectItem>
-                                                                <SelectItem value="INDIVIDUAL">Individuel</SelectItem>
-                                                            </SelectContent>
-                                                        </Select>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        <Button
-                                            className="w-full mt-4 cursor-pointer"
-                                            onClick={handleSaveData}
-                                            disabled={isSubmitting}
-                                        >
-                                            <Save className="w-4 h-4 mr-2" />
-                                            {isSubmitting ? 'Sauvegarde...' : 'Sauvegarder les données'}
-                                        </Button>
+                                {/* Options d'affichage */}
+                                <div className="space-y-3">
+                                    <h3 className="flex items-center gap-2 text-md">
+                                        {/* <Eye className="w-4 h-4" /> */}
+                                        Choisissez les elements a afficher/masquer
+                                    </h3>
+                                    
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <Label className="text-sm">Empiètements</Label>
+                                            <Switch
+                                                checked={selectOverlapsFromState}
+                                                onCheckedChange={handleViewOverlapChange}
+                                            />
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <Label className="text-sm">Champ de recherche</Label>
+                                            <Switch
+                                                checked={selectSearchFromState}
+                                                onCheckedChange={handleViewSearchChange}
+                                            />
+                                        </div>
                                     </div>
-                                ) : (
-                                    <Button
-                                        variant="ghost"
-                                        className="flex flex-row ml-2 cursor-pointer active:bg-secondary"
-                                        onClick={handleImportGeoJson}
+                                </div>
+
+                                {/* Empiettements */}
+                                {/* <div className="space-y-3">
+                                    <h3 className="flex items-center gap-2 font-semibold text-md">
+                                        <MapPin className="w-4 h-4" />
+                                        Zones d'empiètement
+                                        <Badge variant="secondary" className="ml-2">
+                                            {overlappingAreas.length}
+                                        </Badge>
+                                    </h3>
+                                    
+                                    {overlappingAreas.length > 0 ? (
+                                        <div className="space-y-2 overflow-y-auto max-h-32">
+                                            {overlappingAreas.map((overlap) => (
+                                                <div
+                                                    key={overlap.id}
+                                                    className="p-2 border rounded-md cursor-pointer hover:bg-gray-50"
+                                                    onClick={() => handleShowOverlapDetails(overlap)}
+                                                >
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className={`w-3 h-3 rounded-full ${getSeverityColor(overlap.severity)}`} />
+                                                            <span className="text-sm font-medium">
+                                                                Emp. #{overlap.id}
+                                                            </span>
+                                                        </div>
+                                                        <Badge variant="outline">
+                                                            {getSeverityText(overlap.severity)}
+                                                        </Badge>
+                                                    </div>
+                                                    <div className="mt-1 text-xs text-gray-500">
+                                                        {overlap.properties.length} propriétés • {overlap.area}m²
+                                                    </div>
+                                                    <div className="text-xs text-gray-400">
+                                                        {overlap.location}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="py-4 text-sm text-center text-gray-500">
+                                            <Building className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                                            Aucun empiètement détecté
+                                        </div>
+                                    )}
+                                    
+                                    <Button 
+                                        variant="outline" 
+                                        size="sm" 
+                                        className="w-full"
+                                        onClick={() => {
+                                            toast({
+                                                title: "Analyse des empiètements",
+                                                description: "Recherche des conflits en cours...",
+                                                variant: "default"
+                                            });
+                                        }}
                                     >
-                                        <Download className="w-4 h-4 mr-2" />
-                                        Importer GeoJSON (taille &lt; 7 MB)
+                                        <Search className="w-4 h-4 mr-2" />
+                                        Analyser les empiètements
                                     </Button>
-                                )}
+                                </div> */}
                             </div>
                         </div>
                     </CardContent>
@@ -691,4 +254,4 @@ const FileMenu = () => {
     );
 }
 
-export default FileMenu;
+export default ViewMenu;

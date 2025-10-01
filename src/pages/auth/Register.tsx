@@ -42,6 +42,7 @@ export default function Register() {
     profession: "",
     password: "",
     confirmPassword: "",
+    locationCode: null,
     role: "DEFAULT"
   });
   const [ showError, setShowError ] = useState(false);
@@ -215,7 +216,13 @@ export default function Register() {
     }
 
     setShowError(error.trim() !== "");
-    const response = await dispatch(registerUser(formData));
+
+    let submitData = { ...formData };
+    if (formData.locationCode != null && formData.locationCode !== "") {
+      submitData.role = "TENANT";
+    }
+    console.log("SUBMIT DATA", submitData);
+    const response = await dispatch(registerUser(submitData));
 
     //console.log("REGISTER RESPONSE", response);
     
@@ -427,6 +434,25 @@ export default function Register() {
                     <Eye className="w-5 h-5" />
                   )}
                 </button>
+              </div>
+            </div>
+            
+            {/* Code locataire (optionnel) */}
+            <div className="space-y-2">
+              <label htmlFor="locationCode" className="text-sm font-medium text-gray-700">
+                Code locataire <span className="text-xs text-gray-400">(si vous en avez un)</span>
+              </label>
+              <div className="relative">
+                <Building className="absolute w-5 h-5 text-gray-400 transform -translate-y-1/2 left-3 top-1/2" />
+                <Input
+                  id="locationCode"
+                  name="locationCode"
+                  type="text"
+                  placeholder="Entrez votre code locataire (facultatif)"
+                  value={formData.locationCode || ""}
+                  onChange={handleChange}
+                  className="pl-10"
+                />
               </div>
             </div>
 

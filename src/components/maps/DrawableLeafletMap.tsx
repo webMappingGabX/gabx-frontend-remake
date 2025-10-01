@@ -32,11 +32,15 @@ L.Icon.Default.mergeOptions({
 });
 
 const DrawableLeafletMap = ({
-  currentPlot
+  currentPlot,
+  currentEditionFig,
+  setCurrentEditionFig,
+  currentEditionPoint,
+  setCurrentEditionPoint
 }) => {
 
-  const [currentEditionPoint, setCurrentEditionPoint] = useState(null);
-  const [currentEditionFig, setCurrentEditionFig] = useState(null);
+  // const [currentEditionPoint, setCurrentEditionPoint] = useState(null);
+  // const [currentEditionFig, setCurrentEditionFig] = useState(null);
   const [plotChange, setPlotChange] = useState(false);
 
   //const currentPlot = useSelector(selectCurrentPlot);
@@ -148,6 +152,7 @@ const DrawableLeafletMap = ({
       
       if (currentPlot.geom.type === "GeometryCollection" && currentPlot.geom.geometries) {
         // Priorité des types de géométrie (du plus souhaité au moins souhaité)
+        // const priorityOrder = ["MultiPolygon", "Polygon", "MultiLineString", "LineString", "Point"];
         const priorityOrder = ["MultiPolygon", "Polygon", "MultiLineString", "LineString", "Point"];
         
         // Chercher dans l'ordre de priorité
@@ -619,6 +624,8 @@ const DrawableLeafletMap = ({
                         fillOpacity: 0.2 
                       }).addTo(mapInstance.current);
 
+                      console.log("----------> MULTIPOLYGON LAT LONG", latlngs);
+
                       latlngs.forEach((latlng, index) => {
                         createVertexMarker(latlng, leafletLayer, index);
                       });
@@ -631,6 +638,7 @@ const DrawableLeafletMap = ({
                 break;
                 
               case 'Polygon':
+              { 
                 const polyLatLngs = geometry.coordinates[0].map(coord => L.latLng(coord[1], coord[0]));
                 const polyLayer = L.polygon(polyLatLngs, { 
                   color: '#3B82F6', 
@@ -638,13 +646,16 @@ const DrawableLeafletMap = ({
                   fillOpacity: 0.2 
                 }).addTo(mapInstance.current);
 
+                console.log("----------> POLYGON LAT LONG", polyLatLngs);
+                
                 polyLatLngs.forEach((latlng, index) => {
                   createVertexMarker(latlng, polyLayer, index);
                 });
 
                 addSegmentClickHandler(polyLayer, 'Polygon');
                 layers.push(polyLayer);
-                break;
+                break; 
+              }
                 
               case 'MultiLineString':
                 geometry.coordinates.forEach((lineCoords, lineIndex) => {
@@ -729,7 +740,10 @@ const DrawableLeafletMap = ({
             console.log("LOAD MULTIPOLYGON");
             // layers = createEditableLayer(currentEditionFig.coordinates, 'MultiPolygon');
             layers = createEditableLayer(currentEditionFig);
-          }
+          } else {
+            console.log("LOAD OTHERS");
+            layers = createEditableLayer(currentEditionFig);
+          } 
 
           // Stocker les couches créées
           geoJsonLayerRef.current = L.layerGroup(layers).addTo(mapInstance.current);
@@ -1204,12 +1218,11 @@ const DrawableLeafletMap = ({
                 <TooltipTrigger asChild>
                   <Button
                     onClick={() => fitMapToGeometry(currentEditionFig)}
-                    variant="outline"
-                    className="flex flex-col items-center justify-center h-12 gap-1"
+                    size="icon"
+                    className="w-10 h-10 text-gray-700 bg-white rounded-full shadow-md hover:bg-gray-50"
                     disabled={!currentEditionFig}
                   >
-                    <Navigation className="w-4 h-4" />
-                    <span className="text-xs">Centrer figure</span>
+                    <Navigation className="w-5 h-5" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Centrer sur la figure actuelle</TooltipContent>
@@ -1342,6 +1355,21 @@ const DrawableLeafletMap = ({
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>Dessiner un polygone</TooltipContent>
+                  </Tooltip>
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        onClick={() => fitMapToGeometry(currentEditionFig)}
+                        variant="outline"
+                        className="flex flex-col items-center justify-center h-12 gap-1"
+                        disabled={!currentEditionFig}
+                      >
+                        <Navigation className="w-4 h-4" />
+                        <span className="text-xs">Centrer figure</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Centrer sur la figure actuelle</TooltipContent>
                   </Tooltip>
 
                   <Tooltip>

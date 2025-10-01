@@ -41,7 +41,7 @@ function App() {
             <MainLayout />
           </AuthProtectedRoute>
         }>
-          {/* <Route path='/' element={ <Navigate to={`/map`} replace /> } /> */}
+          <Route path='/' element={ <Navigate to={`/map`} replace /> } />
           <Route path='/admin' element={<UserProfile />} />
           <Route path='/observations' element={<UserObservationsPage />} />
           <Route path='/profile' element={<UserProfile />} />

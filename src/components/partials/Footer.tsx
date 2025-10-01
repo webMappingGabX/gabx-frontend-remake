@@ -13,6 +13,7 @@ import {
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Link } from "react-router-dom";
+import logoView3 from "../../assets/SIC_MAP_VIEW3.jpg";
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
@@ -32,9 +33,10 @@ const Footer = () => {
           {/* Colonne 1 : Logo & Description */}
           <div className="space-y-4">
             <Link to="/map" className="flex items-center gap-2">
-              <Map className="w-8 h-8 text-blue-600" />
+              {/* <Map className="w-8 h-8 text-blue-600" /> */}
+              <img src={logoView3} alt="image logo" className="w-10 h-10" />
               <span className="text-xl font-bold text-slate-800 dark:text-white">
-                GabX
+                SIC MAP VIEW
               </span>
             </Link>
             <p className="text-sm text-slate-600 dark:text-slate-400">
@@ -45,7 +47,7 @@ const Footer = () => {
             <div className="pt-2 space-y-2">
               <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
                 <Mail className="w-4 h-4" />
-                <span>contact@gabX.com</span>
+                <span>contact@sicmapview.com</span>
               </div>
               <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
                 <Phone className="w-4 h-4" />
@@ -138,7 +140,7 @@ const Footer = () => {
         <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
           <div className="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-500">
             <Copyright className="w-4 h-4" />
-            <span>{currentYear} GabX. Tous droits réservés.</span>
+            <span>{currentYear} SIC MAP VIEW. Tous droits réservés.</span>
           </div>
           
           <div className="flex flex-wrap items-center justify-center gap-6 text-sm">

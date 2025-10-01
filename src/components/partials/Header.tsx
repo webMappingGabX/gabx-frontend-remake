@@ -6,6 +6,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { selectIsAuthenticated, logoutUser } from "../../app/store/slices/authSlice";
 import { isFullyAuthenticated } from "../../utils/tools";
+import logoView3 from "../../assets/SIC_MAP_VIEW3.jpg";
+
 
 // Type pour le dispatch Redux Toolkit
 type AppDispatch = ReturnType<typeof useDispatch>;
@@ -47,12 +49,14 @@ const Header = () => {
           
           {/* Logo */}
           <Link to="/map" className="flex flex-row items-center gap-2">
-            <Map className="w-6 h-6 text-primary" />
+            {/* <Map className="w-6 h-6 text-primary" /> */}
+            <img src={logoView3} alt="image logo" className="w-10 h-10" />
+            
             <motion.span 
               className="text-2xl font-bold text-transparent bg-gradient-to-r from-primary to-purple-600 bg-clip-text"
               whileHover={{ scale: 1.05 }}
             >
-              GabX
+              SIC MAP VIEW
             </motion.span>
           </Link>
 

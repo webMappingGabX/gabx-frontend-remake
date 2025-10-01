@@ -114,7 +114,7 @@ const DashboardLayout = () => {
           <div className="flex items-center justify-between h-16 px-4 border-b border-gray-800">
             <div className="flex items-center space-x-2">
               <Shield className="w-8 h-8 text-blue-400" />
-              <span className="text-xl font-bold">Admin GabX</span>
+              <span className="text-xl font-bold">Admin SIC MAP VIEW</span>
             </div>
             <button 
               className="lg:hidden"

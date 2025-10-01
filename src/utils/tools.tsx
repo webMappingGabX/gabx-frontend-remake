@@ -20,3 +20,19 @@ export function getCookie(name) {
     return null;
 };
 */
+
+export const convertToGeometryCollection = (geometry: Record<string, unknown>): Record<string, unknown> => {
+  // Convert any geometry to a GeometryCollection
+  if (!geometry) {
+      throw new Error("Aucune géométrie fournie");
+  }
+  // If already a GeometryCollection, return as is
+  if (geometry.type === 'GeometryCollection') {
+      return geometry;
+  }
+  // Otherwise, wrap the geometry in a GeometryCollection
+  return {
+      type: 'GeometryCollection',
+      geometries: [geometry]
+  };
+};

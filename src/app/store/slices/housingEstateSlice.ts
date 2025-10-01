@@ -144,6 +144,7 @@ export const createHousingEstate = createAsyncThunk(
     async (housingEstateData: HousingEstate) => {
         try {
             const response = await axios.post('/housing-estates', housingEstateData);
+            console.log("CREATED HE SLICE DATA", response);
             return response.data;
         } catch (error) {
             console.log("CREATE HOUSING ESTATE ERROR     ", error)

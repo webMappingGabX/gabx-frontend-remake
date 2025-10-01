@@ -1,15 +1,18 @@
-// Fichier: src/hooks/use-toast.ts
+// Fichier: src/hooks/useToast.ts
 import * as React from "react"
 
 const TOAST_LIMIT = 5
-const TOAST_REMOVE_DELAY = 1500
+const TOAST_REMOVE_DELAY = 5000 // Augmenté à 5 secondes pour une meilleure lisibilité
+const TOAST_ANIMATION_DURATION = 300
 
 type ToasterToast = {
   id: string
   title?: string
   description?: string
   action?: React.ReactElement
-  variant?: "default" | "destructive"
+  variant?: "default" | "destructive" | "success" | "warning"
+  duration?: number
+  icon?: React.ReactElement
 }
 
 const actionTypes = {
@@ -23,7 +26,7 @@ let count = 0
 
 function genId() {
   count = (count + 1) % Number.MAX_SAFE_INTEGER
-  return count.toString()
+  return `toast-${count}`
 }
 
 type Action =
@@ -61,17 +64,35 @@ const addToRemoveQueue = (toastId: string) => {
       type: "REMOVE_TOAST",
       toastId: toastId,
     })
-  }, TOAST_REMOVE_DELAY)
+  }, TOAST_ANIMATION_DURATION) // Retard pour l'animation de sortie
 
   toastTimeouts.set(toastId, timeout)
+}
+
+const addToAutoDismissQueue = (toastId: string, duration: number = TOAST_REMOVE_DELAY) => {
+  const timeout = setTimeout(() => {
+    dispatch({
+      type: "DISMISS_TOAST",
+      toastId: toastId,
+    })
+  }, duration)
+
+  return timeout
 }
 
 export const reducer = (state: State, action: Action): State => {
   switch (action.type) {
     case "ADD_TOAST":
+      const newToast = action.toast
+      // Démarrer le timer de disparition automatique
+      if (newToast.duration !== 0) { // 0 = pas de disparition automatique
+        const dismissTimeout = addToAutoDismissQueue(newToast.id, newToast.duration || TOAST_REMOVE_DELAY)
+        toastTimeouts.set(`dismiss-${newToast.id}`, dismissTimeout)
+      }
+      
       return {
         ...state,
-        toasts: [action.toast, ...state.toasts].slice(0, TOAST_LIMIT),
+        toasts: [newToast, ...state.toasts].slice(0, TOAST_LIMIT),
       }
 
     case "UPDATE_TOAST":
@@ -85,10 +106,21 @@ export const reducer = (state: State, action: Action): State => {
     case "DISMISS_TOAST": {
       const { toastId } = action
 
+      // Nettoyer le timer de disparition automatique
       if (toastId) {
+        const dismissTimeout = toastTimeouts.get(`dismiss-${toastId}`)
+        if (dismissTimeout) {
+          clearTimeout(dismissTimeout)
+          toastTimeouts.delete(`dismiss-${toastId}`)
+        }
         addToRemoveQueue(toastId)
       } else {
         state.toasts.forEach((toast) => {
+          const dismissTimeout = toastTimeouts.get(`dismiss-${toast.id}`)
+          if (dismissTimeout) {
+            clearTimeout(dismissTimeout)
+            toastTimeouts.delete(`dismiss-${toast.id}`)
+          }
           addToRemoveQueue(toast.id)
         })
       }
@@ -133,10 +165,10 @@ function dispatch(action: Action) {
 
 type Toast = Omit<ToasterToast, "id">
 
-function toast({ ...props }: Toast) {
+function toast({ duration = TOAST_REMOVE_DELAY, ...props }: Toast & { duration?: number }) {
   const id = genId()
 
-  const update = (props: ToasterToast) =>
+  const update = (props: Partial<ToasterToast>) =>
     dispatch({
       type: "UPDATE_TOAST",
       toast: { ...props, id },
@@ -148,6 +180,7 @@ function toast({ ...props }: Toast) {
     toast: {
       ...props,
       id,
+      duration,
       open: true,
       onOpenChange: (open: boolean) => {
         if (!open) dismiss()

@@ -12,7 +12,8 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  File
+  File,
+  Edit
 } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Toggle } from "../../components/ui/toggle";
@@ -41,7 +42,7 @@ const MapToolbar = () => {
 
     // Outils disponibles dans la toolbar
     const tools = [
-    {
+    /*{
         id: "search",
         icon: Search,
         label: "Recherche",
@@ -54,13 +55,20 @@ const MapToolbar = () => {
         label: "Couches",
         action: () => dispatch(toggleLayers()),
         active: isLayersActive
-    },
+    },*/
     {
         id: "fichier",
         icon: File,
         label: "Fichier",
         action: () => dispatch(openMenu(AvailableMenus.FILE)),
         active: currentOpenedMenu === AvailableMenus.FILE
+    },
+    {
+        id: "Edition",
+        icon: Edit,
+        label: "Edition",
+        action: () => dispatch(openMenu(AvailableMenus.EDIT)),
+        active: currentOpenedMenu === AvailableMenus.EDIT
     },
     {
         id: "vues",
@@ -73,9 +81,10 @@ const MapToolbar = () => {
         id: "export",
         icon: Download,
         label: "Exporter",
-        action: () => toast({ title: "Fonctionnalité à venir", description: "Gestion des marqueurs" })
+        action: () => dispatch(openMenu(AvailableMenus.EXPORT)),
+        active: currentOpenedMenu === AvailableMenus.EXPORT
     },
-    {
+    /*{
         id: "marker",
         icon: MapPin,
         label: "Marqueurs",
@@ -92,7 +101,7 @@ const MapToolbar = () => {
         icon: Settings,
         label: "Paramètres",
         action: () => toast({ title: "Fonctionnalité à venir", description: "Paramètres de la carte" })
-    }
+    }*/
     ];
 
     const handleScroll = (direction: 'left' | 'right') => {
