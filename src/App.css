@@ -140,3 +140,12 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* .force-classic-colors,
+.force-classic-colors * {
+  color: #000000 !important;
+  background-color: #ffffff !important;
+  border-color: #cccccc !important;
+  fill: currentColor !important;
+  stroke: currentColor !important;
+} */
