@@ -74,6 +74,7 @@ const FileMenu = () => {
     const districtsFromStates = useSelector(selectArrondState);
     const townsFromStates = useSelector(selectTownsState);
 
+    const maxMo = 7;
     // Use Effect
     useEffect(() => {
         const loadRegions = async () => {
@@ -421,11 +422,11 @@ const FileMenu = () => {
             const target = e.target as HTMLInputElement;
             const file = target.files?.[0];
             if (file) {
-                const maxSize = 7 * 1024 * 1024;
+                const maxSize = maxMo * 1024 * 1024;
                 if (file.size > maxSize) {
                     toast({
                         title: "Fichier trop volumineux",
-                        description: `Le fichier fait ${formatFileSize(file.size)}. La taille maximale autorisée est de 7 MB.`,
+                        description: `Le fichier fait ${formatFileSize(file.size)}. La taille maximale autorisée est de ${maxMo} MB.`,
                         variant: "destructive"
                     });
                     return;
@@ -686,7 +687,7 @@ const FileMenu = () => {
                                         onClick={handleImportGeoJson}
                                     >
                                         <Download className="w-4 h-4 mr-2" />
-                                        Importer GeoJSON (taille &lt; 7 MB)
+                                        Importer GeoJSON (taille &lt; {maxMo} MB)
                                     </Button>
                                 )}
                             </div>
