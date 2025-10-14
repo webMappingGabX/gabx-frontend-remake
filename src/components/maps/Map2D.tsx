@@ -8,7 +8,9 @@ import {
   Ruler, 
   Download,
   Search,
-  Fullscreen
+  Fullscreen,
+  Camera,
+  Crop
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -26,6 +28,8 @@ import { isFulfilled } from "@reduxjs/toolkit";
 import { useNavigate } from "react-router-dom";
 import EditionMenu from "../menus/EditionMenu";
 import ConfirmDialog from "../dialogs/ConfirmDialog";
+import html2canvas from "html2canvas";
+import 'leaflet-easyprint';
 
 // Import Turf.js pour les calculs géospatiaux
 import * as turf from "@turf/turf";
@@ -87,7 +91,9 @@ const Map2D = () => {
   const mapInstance = useRef<L.Map | null>(null);
   const [parcelleLayers, setParcelleLayers] = useState<L.LayerGroup | null>(null);
   const [intersectionLayers, setIntersectionLayers] = useState<L.LayerGroup | null>(null);
-
+  const [printControl, setPrintControl] = useState<any>(null);
+  const printControlRef = useRef<any>(null);
+  
   const dispatch = useDispatch();
   const isSearchActive = useSelector(selectSearch);
   const isLayersActive = useSelector(selectLayers);
@@ -95,35 +101,17 @@ const Map2D = () => {
   const selectedPlots = useSelector(selectPlots);
 
   const navigate = useNavigate();
-  const [parcelles, setParcelles] = useState<Parcelle[]>([
-    {
-      id: "YDE-001",
-      nom: "Parcelle Bastos",
-      superficie: 4.5,
-      coordinates: [
-        [3.8700, 11.5200],
-        [3.8720, 11.5200],
-        [3.8720, 11.5180],
-        [3.8700, 11.5180]
-      ],
-      type: "Résidentielle",
-      proprietaire: "Jean Mvondo"
-    },
-    {
-      id: "YDE-002",
-      nom: "Parcelle Mvog Ada",
-      superficie: 3.2,
-      coordinates: [
-        [3.8660, 11.5220],
-        [3.8680, 11.5220],
-        [3.8680, 11.5200],
-        [3.8660, 11.5200]
-      ],
-      type: "Commerciale",
-      proprietaire: "Aminatou Oumarou"
-    }
-  ]);
+  const [parcelles, setParcelles] = useState<Parcelle[]>([]);
 
+  const [isSelectingArea, setIsSelectingArea] = useState(false);
+  const [isDrawingArea, setIsDrawingArea] = useState(false);
+  const [selectionRect, setSelectionRect] = useState<{
+    startX: number;
+    startY: number;
+    endX: number;
+    endY: number;
+  } | null>(null);
+  
   const multiStyle = {
     color: '#f59e42',
     weight: 2,
@@ -248,6 +236,20 @@ const Map2D = () => {
     });
   };
 
+  useEffect(() => {
+    if (mapInstance.current && !printControlRef.current) {
+      // @ts-ignore
+      printControlRef.current = L.easyPrint({
+        title: 'Exporter la carte',
+        position: 'topleft',
+        sizeModes: ['Current', 'A4Landscape', 'A4Portrait'],
+        exportOnly: true,
+        hideControlContainer: true,
+        autoPrint: false
+      }).addTo(mapInstance.current);
+    }
+  }, [mapInstance.current]);
+
   // Écouter l'événement personnalisé pour sélectionner une intersection
   useEffect(() => {
     const handleSelectIntersection = (event: CustomEvent) => {
@@ -303,6 +305,19 @@ const Map2D = () => {
       });
     }
     
+    // Initialiser easyPrint
+    if (mapInstance.current) {
+      // @ts-ignore
+      const printC = L.easyPrint({
+        title: 'Exporter la carte',
+        position: 'topleft',
+        sizeModes: ['Current', 'A4Landscape', 'A4Portrait'],
+        exportOnly: true,
+        hideControlContainer: true
+      }).addTo(mapInstance.current);
+
+      setPrintControl(printC);
+    }
     return () => {
       if (mapInstance.current) {
         mapInstance.current.remove();
@@ -700,12 +715,914 @@ const Map2D = () => {
     }
   }
   
-  return (
+  // FONCTIONS DE CAPTURE
+  // Fonction utilitaire pour nettoyer les styles problématiques
+  /*const cleanProblematicStyles = (element: HTMLElement) => {
+    // Remplacer les couleurs oklch par des équivalents hexadécimaux
+    const style = window.getComputedStyle(element);
+    
+    // Gérer la couleur de texte
+    if (style.color.includes('oklch')) {
+      element.style.color = '#000000'; // Noir par défaut
+    }
+    
+    // Gérer le fond
+    if (style.backgroundColor.includes('oklch')) {
+      if (style.backgroundColor.includes('/')) {
+        // C'est probablement un bg avec opacity comme bg-primary/80
+        element.style.backgroundColor = '#3b82f6'; // Bleu par défaut
+      } else {
+        element.style.backgroundColor = '#ffffff'; // Blanc par défaut
+      }
+    }
+    
+    // Gérer les bordures
+    if (style.borderColor.includes('oklch')) {
+      element.style.borderColor = '#d1d5db'; // Gris par défaut
+    }
+    
+    // Traiter récursivement les enfants
+    Array.from(element.children).forEach(child => {
+      cleanProblematicStyles(child as HTMLElement);
+    });
+  };*/
+
+
+
+
+
+
+
+
+
+
+
+
+  // Fonction améliorée pour capturer toute la carte
+  const captureFullMap = async () => {
+    if (!mapInstance.current) return;
+    
+    try {
+      // Méthode 1: Utiliser EasyPrint si disponible
+      if (printControlRef.current) {
+        printControlRef.current.printMap('CurrentSize', `carte_complete_${Date.now()}`);
+        toast({
+          title: "Capture démarrée",
+          description: "L'export de la carte a été lancé"
+        });
+        return;
+      }
+      
+      // Méthode 2: Fallback avec html2canvas
+      await captureWithHtml2Canvas();
+      
+    } catch (error) {
+      console.error('Erreur capture complète:', error);
+      toast({
+        title: "Erreur de capture",
+        description: "Impossible de capturer la carte",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const captureWithHtml2Canvas = async () => {
+    if (!mapRef.current) return;
+    
+    // Sauvegarder les styles problématiques temporairement
+    const originalStyles: { [key: string]: string } = {};
+    const elements = mapRef.current.querySelectorAll('*');
+    
+    elements.forEach(el => {
+      const htmlEl = el as HTMLElement;
+      if (window.getComputedStyle(htmlEl).color.includes('oklch')) {
+        originalStyles[htmlEl.className] = htmlEl.style.cssText;
+        htmlEl.style.color = '#000000';
+      }
+      if (window.getComputedStyle(htmlEl).backgroundColor.includes('oklch')) {
+        htmlEl.style.backgroundColor = '#ffffff';
+      }
+    });
+  
+    try {
+      const canvas = await html2canvas(mapRef.current, {
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor: '#ffffff',
+        scale: 1,
+        logging: true,
+        onclone: (clonedDoc, element) => {
+          // Nettoyer les styles dans le clone
+          cleanProblematicStyles(element);
+        }
+      });
+      
+      const image = canvas.toDataURL('image/png');
+      downloadImage(image, `carte_complete_${Date.now()}.png`);
+      
+      toast({
+        title: "Capture réussie",
+        description: "La carte complète a été téléchargée"
+      });
+    } finally {
+      // Restaurer les styles originaux
+      elements.forEach(el => {
+        const htmlEl = el as HTMLElement;
+        if (originalStyles[htmlEl.className]) {
+          htmlEl.style.cssText = originalStyles[htmlEl.className];
+        }
+      });
+    }
+  };
+
+  // Fonction améliorée pour capturer la zone sélectionnée
+  /*const captureSelectedArea = async () => {
+    if (!mapRef.current || !selectionRect) return;
+    
+    try {
+      enableLeafletInteractions();
+      
+      const canvas = await html2canvas(mapRef.current, {
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor: '#ffffff',
+        scale: 1,
+        logging: false,
+        x: Math.min(selectionRect.startX, selectionRect.endX),
+        y: Math.min(selectionRect.startY, selectionRect.endY),
+        width: Math.abs(selectionRect.endX - selectionRect.startX),
+        height: Math.abs(selectionRect.endY - selectionRect.startY),
+        onclone: (clonedDoc, element) => {
+          // Nettoyer les styles problématiques dans le clone
+          cleanProblematicStyles(element);
+        }
+      });
+      
+      const image = canvas.toDataURL('image/png');
+      downloadImage(image, `zone_selectionnee_${new Date().getTime()}.png`);
+      
+      setIsSelectingArea(false);
+      setSelectionRect(null);
+      
+      toast({
+        title: "Capture réussie",
+        description: "La zone sélectionnée a été capturée et téléchargée"
+      });
+    } catch (error) {
+      console.error('Erreur lors de la capture:', error);
+      enableLeafletInteractions();
+      setIsSelectingArea(false);
+      setSelectionRect(null);
+      
+      toast({
+        title: "Erreur de capture",
+        description: "Impossible de capturer la zone sélectionnée",
+        variant: "destructive"
+      });
+    }
+  };*/
+  
+  /*const captureSelectedArea = async () => {
+    if (!mapInstance.current || !selectionRect) return;
+    
+    // Sauvegarder la vue actuelle
+    const originalCenter = mapInstance.current.getCenter();
+    const originalZoom = mapInstance.current.getZoom();
+    
+    try {
+      // Convertir les coordonnées d'écran en coordonnées géographiques
+      const mapContainer = mapInstance.current.getContainer();
+      const mapRect = mapContainer.getBoundingClientRect();
+      
+      const startPoint = L.point(
+        selectionRect.startX,
+        selectionRect.startY
+      );
+      const endPoint = L.point(
+        selectionRect.endX,
+        selectionRect.endY
+      );
+      
+      const startLatLng = mapInstance.current.containerPointToLatLng(startPoint);
+      const endLatLng = mapInstance.current.containerPointToLatLng(endPoint);
+      
+      const bounds = L.latLngBounds(startLatLng, endLatLng);
+    
+      
+      // Ajuster la vue pour cadrer la sélection
+      mapInstance.current.fitBounds(bounds);
+      
+      // Attendre que la carte se stabilise
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      // Capturer la vue ajustée
+      if (printControlRef.current) {
+        printControlRef.current.printMap('CurrentSize', `zone_selectionnee_${Date.now()}`);
+      } else {
+        // Fallback: capturer avec html2canvas
+        await captureViewportWithHtml2Canvas();
+      }
+      
+      toast({
+        title: "Capture réussie",
+        description: "La zone sélectionnée a été capturée"
+      });
+      
+    } catch (error) {
+      console.error('Erreur capture zone:', error);
+      toast({
+        title: "Erreur de capture",
+        description: "Impossible de capturer la zone sélectionnée",
+        variant: "destructive"
+      });
+    } finally {
+      // TOUJOURS restaurer la vue originale
+      if (mapInstance.current) {
+        mapInstance.current.setView(originalCenter, originalZoom);
+      }
+      setIsSelectingArea(false);
+      setSelectionRect(null);
+      enableLeafletInteractions();
+    }
+  };*/
+
+  const captureSelectedArea = async () => {
+    if (!mapInstance.current || !selectionRect) return;
+    
+    // Sauvegarder la vue actuelle
+    const originalCenter = mapInstance.current.getCenter();
+    const originalZoom = mapInstance.current.getZoom();
+    
+    try {
+      // Convertir les coordonnées d'écran en coordonnées géographiques
+      const startPoint = L.point(selectionRect.startX, selectionRect.startY);
+      const endPoint = L.point(selectionRect.endX, selectionRect.endY);
+      
+      const startLatLng = mapInstance.current.containerPointToLatLng(startPoint);
+      const endLatLng = mapInstance.current.containerPointToLatLng(endPoint);
+      
+      const bounds = L.latLngBounds(startLatLng, endLatLng);
+      
+      // Ajuster la vue pour cadrer exactement la sélection
+      mapInstance.current.fitBounds(bounds);
+      
+      // Attendre que la carte se stabilise
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      // Maintenant utiliser EasyPrint pour capturer cette vue ajustée
+      if (printControlRef.current) {
+        const timestamp = new Date().getTime();
+        printControlRef.current.printMap('CurrentSize', `zone_selectionnee_${timestamp}`);
+        
+        toast({
+          title: "Capture de zone démarrée",
+          description: "La zone sélectionnée est en cours d'export"
+        });
+      } else {
+        await captureViewportManually();
+      }
+      
+    } catch (error) {
+      console.error('Erreur capture zone:', error);
+      toast({
+        title: "Erreur",
+        description: "Échec de la capture de zone",
+        variant: "destructive"
+      });
+    } finally {
+      // Restaurer la vue originale après un délai pour laisser le temps à l'export
+      setTimeout(() => {
+        if (mapInstance.current) {
+          mapInstance.current.setView(originalCenter, originalZoom);
+        }
+        setIsSelectingArea(false);
+        setSelectionRect(null);
+        enableLeafletInteractions();
+      }, 1000);
+    }
+  };
+  
+  // Méthode de fallback pour la capture de zone
+  const captureSelectedAreaFallback = async () => {
+    if (!mapRef.current || !selectionRect) return;
+    
+    try {
+      // Capturer tout l'écran puis recadrer
+      const fullCanvas = await html2canvas(document.body, {
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor: '#ffffff',
+        scale: 1,
+        logging: false
+      });
+      
+      const startX = Math.min(selectionRect.startX, selectionRect.endX);
+      const startY = Math.min(selectionRect.startY, selectionRect.endY);
+      const width = Math.abs(selectionRect.endX - selectionRect.startX);
+      const height = Math.abs(selectionRect.endY - selectionRect.startY);
+      
+      // Créer un canvas pour la zone recadrée
+      const croppedCanvas = document.createElement('canvas');
+      croppedCanvas.width = width;
+      croppedCanvas.height = height;
+      const ctx = croppedCanvas.getContext('2d');
+      
+      if (!ctx) {
+        throw new Error('Impossible de créer le contexte canvas');
+      }
+      
+      // Dessiner uniquement la zone sélectionnée
+      ctx.drawImage(
+        fullCanvas,
+        startX, startY, // Position de départ dans l'image complète
+        width, height,  // Dimensions de la zone à copier
+        0, 0,           // Position de départ dans le nouveau canvas
+        width, height   // Dimensions dans le nouveau canvas
+      );
+      
+      const image = croppedCanvas.toDataURL('image/png');
+      downloadImage(image, `zone_selectionnee_fallback_${Date.now()}.png`);
+      
+      setIsSelectingArea(false);
+      setSelectionRect(null);
+      enableLeafletInteractions();
+      
+      toast({
+        title: "Capture réussie (méthode alternative)",
+        description: "La zone sélectionnée a été capturée"
+      });
+      
+    } catch (error) {
+      console.error('Erreur capture fallback:', error);
+      toast({
+        title: "Erreur de capture",
+        description: "Impossible de capturer la zone sélectionnée",
+        variant: "destructive"
+      });
+      enableLeafletInteractions();
+      setIsSelectingArea(false);
+      setSelectionRect(null);
+    }
+  };
+
+  // Capture de la viewport avec html2canvas (fallback)
+  const captureViewportWithHtml2Canvas = async () => {
+    if (!mapRef.current) return;
+    
+    try {
+      const canvas = await html2canvas(mapRef.current, {
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor: '#ffffff',
+        scale: 1,
+        logging: false,
+        onclone: (clonedDoc, element) => {
+          cleanProblematicStyles(element);
+          // Masquer temporairement les contrôles UI
+          const controls = clonedDoc.querySelectorAll('.leaflet-control-container');
+          controls.forEach(control => {
+            (control as HTMLElement).style.opacity = '0';
+          });
+        }
+      });
+      
+      const image = canvas.toDataURL('image/png');
+      downloadImage(image, `viewport_${Date.now()}.png`);
+    } catch (error) {
+      console.error('Erreur html2canvas:', error);
+      throw error;
+    }
+  };
+
+  // Fonction utilitaire pour nettoyer les styles
+  const cleanProblematicStyles = (element: HTMLElement) => {
+    const style = window.getComputedStyle(element);
+    
+    if (style.color.includes('oklch')) {
+      element.style.color = '#000000';
+    }
+    if (style.backgroundColor.includes('oklch')) {
+      element.style.backgroundColor = '#ffffff';
+    }
+    if (style.borderColor.includes('oklch')) {
+      element.style.borderColor = '#d1d5db';
+    }
+    
+    // Traiter les enfants récursivement
+    Array.from(element.children).forEach(child => {
+      cleanProblematicStyles(child as HTMLElement);
+    });
+  };
+  
+  const captureBounds = (bounds: L.LatLngBounds) => {
+    if (!mapInstance.current) return;
+  
+    // Créer un canvas temporaire
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+  
+    // Déterminer la taille en pixels de la zone sélectionnée
+    const pixelBounds = mapInstance.current.getBounds().pad(-0.1);
+    const zoom = mapInstance.current.getZoom();
+    
+    // Calculer les dimensions
+    const size = mapInstance.current.getSize();
+    const northWest = mapInstance.current.latLngToContainerPoint(bounds.getNorthWest());
+    const southEast = mapInstance.current.latLngToContainerPoint(bounds.getSouthEast());
+    
+    const width = Math.abs(southEast.x - northWest.x);
+    const height = Math.abs(southEast.y - northWest.y);
+  
+    canvas.width = width;
+    canvas.height = height;
+  
+    // Récupérer tous les tiles visibles
+    const tileLayers: L.TileLayer[] = [];
+    mapInstance.current.eachLayer((layer) => {
+      if (layer instanceof L.TileLayer) {
+        tileLayers.push(layer);
+      }
+    });
+  
+    // Fonction pour dessiner les tiles
+    const drawTiles = async () => {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, width, height);
+  
+      for (const tileLayer of tileLayers) {
+        const tiles: any[] = [];
+        
+        // Récupérer les tiles dans les bounds
+        const tileBounds = {
+          minZoom: zoom,
+          maxZoom: zoom,
+          _southWest: bounds.getSouthWest(),
+          _northEast: bounds.getNorthEast()
+        };
+  
+        // Cette partie nécessite d'accéder aux tiles internes de Leaflet
+        // C'est un peu complexe, voici une approche simplifiée :
+        
+        try {
+          // Utiliser une méthode alternative pour capturer la vue
+          await captureLeafletView(bounds, canvas);
+        } catch (error) {
+          console.error('Erreur capture Leaflet:', error);
+          captureUsingOverlay(bounds);
+        }
+      }
+    };
+  
+    drawTiles();
+  };
+
+  const captureUsingOverlay = (bounds: L.LatLngBounds) => {
+    if (!mapInstance.current) return;
+  
+    // Sauvegarder la vue actuelle
+    const originalCenter = mapInstance.current.getCenter();
+    const originalZoom = mapInstance.current.getZoom();
+  
+    // Créer un overlay temporaire pour la capture
+    const captureOverlay = L.rectangle(bounds, {
+      color: '#ff0000',
+      fillColor: '#f03',
+      fillOpacity: 0,
+      interactive: false
+    }).addTo(mapInstance.current);
+  
+    // Ajuster la vue pour cadrer la sélection
+    mapInstance.current.fitBounds(bounds);
+  
+    // Attendre que la carte se stabilise
+    setTimeout(() => {
+      // Utiliser EasyPrint pour capturer la vue ajustée
+      if (printControlRef.current) {
+        printControlRef.current.printMap('CurrentSize', 'Zone_Selectionnee');
+      } else {
+        // Fallback vers une autre méthode
+        //captureViewport();
+      }
+  
+      // Restaurer la vue originale
+      mapInstance.current?.setView(originalCenter, originalZoom);
+      mapInstance.current?.removeLayer(captureOverlay);
+      
+      setIsSelectingArea(false);
+      setSelectionRect(null);
+    }, 500);
+  };
+
+  // Fonction pour télécharger l'image
+  const downloadImage = (dataUrl: string, filename: string) => {
+    const link = document.createElement('a');
+    link.download = filename;
+    link.href = dataUrl;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  useEffect(() => {
+    return () => {
+      // Réactiver les interactions si le composant est démonté
+      if (mapInstance.current) {
+        enableLeafletInteractions();
+      }
+    };
+  }, []);
+  
+  const disableLeafletInteractions = () => {
+    if (!mapInstance.current) return;
+    
+    // Désactiver le déplacement de la carte
+    mapInstance.current.dragging.disable();
+    
+    // Désactiver le zoom avec la molette
+    mapInstance.current.scrollWheelZoom.disable();
+    
+    // Désactiver le double-clic pour zoomer
+    mapInstance.current.doubleClickZoom.disable();
+    
+    // Désactiver le zoom avec shift+clic
+    mapInstance.current.boxZoom.disable();
+    
+    // Désactiver le touch (mobile)
+    mapInstance.current.touchZoom.disable();
+  };
+  
+  const enableLeafletInteractions = () => {
+    if (!mapInstance.current) return;
+    
+    mapInstance.current.dragging.enable();
+    mapInstance.current.scrollWheelZoom.enable();
+    mapInstance.current.doubleClickZoom.enable();
+    mapInstance.current.boxZoom.enable();
+    mapInstance.current.touchZoom.enable();
+  };
+  
+  // Démarrer la sélection de zone
+  const startAreaSelection = () => {
+    setIsSelectingArea(true);
+    disableLeafletInteractions();
+  };
+  
+  // Annuler la sélection de zone
+  const cancelAreaSelection = () => {
+    setIsSelectingArea(false);
+    setSelectionRect(null);
+    enableLeafletInteractions();
+  };
+  
+  // Gestionnaires d'événements de souris modifiés
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!isSelectingArea || !mapRef.current) return;
+    
+    // Empêcher la propagation pour éviter que Leaflet ne capture l'événement
+    e.stopPropagation();
+    e.preventDefault();
+    
+    const rect = mapRef.current.getBoundingClientRect();
+    setSelectionRect({
+      startX: e.clientX - rect.left,
+      startY: e.clientY - rect.top,
+      endX: e.clientX - rect.left,
+      endY: e.clientY - rect.top
+    });
+
+   setIsDrawingArea(true);
+  };
+  
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isSelectingArea || !selectionRect || !mapRef.current || !isDrawingArea) return;
+    
+    // Empêcher la propagation
+    e.stopPropagation();
+    e.preventDefault();
+    
+    const rect = mapRef.current.getBoundingClientRect();
+    setSelectionRect({
+      ...selectionRect,
+      endX: e.clientX - rect.left,
+      endY: e.clientY - rect.top
+    });
+  };
+  
+  const handleMouseUp = (e: React.MouseEvent) => {
+    if (!isSelectingArea || !selectionRect) return;
+    
+    // Empêcher la propagation
+    //e.stopPropagation();
+    e.preventDefault();
+    
+    // Vérifier que la sélection a une taille minimale
+    const width = Math.abs(selectionRect.endX - selectionRect.startX);
+    const height = Math.abs(selectionRect.endY - selectionRect.startY);
+    
+    /*if (width < 50 || height < 50) {
+      // Sélection trop petite
+      toast({
+        title: "Sélection trop petite",
+        description: "Veuillez sélectionner une zone plus grande (min. 50x50 pixels)",
+        variant: "destructive",
+        duration: 2000
+      });
+      setSelectionRect(null);
+    }*/
+
+      setIsDrawingArea(false);
+  };
+  
+  // Fonction pour capturer la zone sélectionnée
+  /*const captureSelectedArea = async () => {
+    if (!mapRef.current || !selectionRect) return;
+    
+    try {
+      // Réactiver les interactions avant la capture
+      enableLeafletInteractions();
+      
+      const canvas = await html2canvas(mapRef.current, {
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor: '#ffffff',
+        scale: 1,
+        logging: false,
+        x: Math.min(selectionRect.startX, selectionRect.endX),
+        y: Math.min(selectionRect.startY, selectionRect.endY),
+        width: Math.abs(selectionRect.endX - selectionRect.startX),
+        height: Math.abs(selectionRect.endY - selectionRect.startY),
+        onclone: (clonedDoc) => {
+          // Nettoyer les styles problématiques
+          const elements = clonedDoc.querySelectorAll('*');
+          elements.forEach(el => {
+            const style = window.getComputedStyle(el);
+            if (style.color.includes('oklch')) {
+              (el as HTMLElement).style.color = '#000000';
+            }
+            if (style.backgroundColor.includes('oklch')) {
+              (el as HTMLElement).style.backgroundColor = '#ffffff';
+            }
+          });
+        }
+      });
+      
+      const image = canvas.toDataURL('image/png');
+      downloadImage(image, `zone_selectionnee_${new Date().getTime()}.png`);
+      
+      // Réinitialiser la sélection
+      setIsSelectingArea(false);
+      setSelectionRect(null);
+      
+      toast({
+        title: "Capture réussie",
+        description: "La zone sélectionnée a été capturée et téléchargée"
+      });
+    } catch (error) {
+      console.error('Erreur lors de la capture:', error);
+      // Réactiver les interactions en cas d'erreur
+      enableLeafletInteractions();
+      setIsSelectingArea(false);
+      setSelectionRect(null);
+      
+      toast({
+        title: "Erreur de capture",
+        description: "Impossible de capturer la zone sélectionnée",
+        variant: "destructive"
+      });
+    }
+  };*/
+
+  const captureWithLeafletNative = () => {
+    if (!mapInstance.current) return;
+    
+    // Créer un canvas temporaire
+    const bounds = mapInstance.current.getBounds();
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    if (!ctx) return;
+    
+    // Définir la taille du canvas
+    const size = mapInstance.current.getSize();
+    canvas.width = size.x;
+    canvas.height = size.y;
+    
+    // Récupérer tous les tiles et les dessiner
+    const layers: Promise<void>[] = [];
+    
+    mapInstance.current.eachLayer((layer: any) => {
+      if (layer instanceof L.TileLayer) {
+        const promise = new Promise<void>((resolve) => {
+          // Cette partie est complexe, voici une approche simplifiée
+          // Vous devrez peut-être adapter selon vos besoins
+          resolve();
+        });
+        layers.push(promise);
+      }
+    });
+    
+    // Méthode alternative plus simple
+    const captureSimple = () => {
+      // Utiliser une approche de screenshot de la zone visible
+      html2canvas(document.body, {
+        useCORS: true,
+        allowTaint: false,
+        // Utiliser une couleur de fond compatible (hex ou rgb, pas oklch)
+        backgroundColor: '#ffffff',
+        scale: 1,
+        logging: false,
+        x: mapRef.current?.getBoundingClientRect().left,
+        y: mapRef.current?.getBoundingClientRect().top,
+        width: size.x,
+        height: size.y,
+        onclone: (clonedDoc, element) => {
+          // Masquer les éléments UI superflus temporairement
+          // Corriger le sélecteur pour éviter les problèmes d'escapes inutiles
+          const uiElements = clonedDoc.querySelectorAll('.leaflet-control-container, .absolute[class*="z-[1000]"]');
+          uiElements.forEach((el: Element) => {
+            (el as HTMLElement).style.opacity = '0';
+          });
+
+          // Corriger les couleurs oklch non supportées dans le DOM cloné
+          // Remplacer toute couleur oklch par une couleur compatible (ex: #fff)
+          const allElements = clonedDoc.querySelectorAll('*');
+          allElements.forEach((el: Element) => {
+            const style = (el as HTMLElement).style;
+            // Vérifier et remplacer les propriétés de couleur utilisant oklch
+            ['color', 'backgroundColor', 'borderColor'].forEach((prop) => {
+              const value = style[prop as any];
+              if (typeof value === 'string' && value.includes('oklch')) {
+                // Remplacer par une couleur compatible
+                style[prop as any] = '#ffffff';
+              }
+            });
+          });
+        }
+      }).then(canvas => {
+        const image = canvas.toDataURL('image/png');
+        downloadImage(image, `carte_native_${new Date().getTime()}.png`);
+        
+        toast({
+          title: "Capture réussie",
+          description: "La carte a été capturée avec succès"
+        });
+      });
+    };
+    
+    captureSimple();
+  };
+
+  // Capture de toute la carte
+  const captureFullMapEP = () => {
+    if (printControl) {
+      printControl.printMap('CurrentSize', 'Carte_Complete');
+    } else {
+      // Fallback si EasyPrint n'est pas prêt
+      captureWithFallback();
+    }
+  };
+
+  // Capture avec sélection de format
+  const captureWithSize = (size: string, filename: string) => {
+    if (printControl) {
+      printControl.printMap(size, filename);
+    } else {
+      toast({
+        title: "Erreur",
+        description: "Le système d'export n'est pas encore prêt",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Fallback method
+  const captureWithFallback = async () => {
+    if (!mapRef.current) return;
+    
+    try {
+      // Utiliser html2canvas avec une configuration minimale
+      const canvas = await html2canvas(mapRef.current, {
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor: '#ffffff',
+        scale: 1,
+        ignoreElements: (element) => {
+          // Ignorer les éléments avec des styles problématiques
+          return element.classList?.contains('leaflet-control-container');
+        }
+      });
+      
+      const image = canvas.toDataURL('image/png');
+      downloadImage(image, `carte_fallback_${new Date().getTime()}.png`);
+      
+      toast({
+        title: "Capture réussie",
+        description: "La carte a été exportée"
+      });
+    } catch (error) {
+      console.error('Erreur capture fallback:', error);
+      toast({
+        title: "Erreur",
+        description: "Impossible d'exporter la carte",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const captureSelectedAreaCanvas = () => {
+    if (!mapRef.current || !selectionRect) return;
+    
+    // Créer un canvas
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    if (!ctx) return;
+    
+    const width = Math.abs(selectionRect.endX - selectionRect.startX);
+    const height = Math.abs(selectionRect.endY - selectionRect.startY);
+    
+    canvas.width = width;
+    canvas.height = height;
+    
+    // Capturer avec la Web API
+    html2canvas(mapRef.current, {
+      x: Math.min(selectionRect.startX, selectionRect.endX),
+      y: Math.min(selectionRect.startY, selectionRect.endY),
+      width: width,
+      height: height,
+      useCORS: true,
+      allowTaint: false,
+      backgroundColor: '#ffffff',
+      scale: 1
+    }).then(canvas => {
+      const image = canvas.toDataURL('image/png');
+      downloadImage(image, `zone_selectionnee_${new Date().getTime()}.png`);
+      
+      setIsSelectingArea(false);
+      setSelectionRect(null);
+      
+      toast({
+        title: "Capture réussie",
+        description: "La zone sélectionnée a été capturée"
+      });
+    }).catch(error => {
+      console.error('Erreur capture zone:', error);
+      // Fallback vers une méthode alternative
+      captureAreaFallback();
+    });
+  };
+  
+  const captureAreaFallback = () => {
+    // Méthode de fallback simple : capture de tout l'écran puis crop
+    html2canvas(document.body).then(fullCanvas => {
+      const ctx = fullCanvas.getContext('2d');
+      if (!ctx || !selectionRect) return;
+      
+      const width = Math.abs(selectionRect.endX - selectionRect.startX);
+      const height = Math.abs(selectionRect.endY - selectionRect.startY);
+      
+      const croppedCanvas = document.createElement('canvas');
+      croppedCanvas.width = width;
+      croppedCanvas.height = height;
+      const croppedCtx = croppedCanvas.getContext('2d');
+      
+      if (!croppedCtx) return;
+      
+      croppedCtx.drawImage(
+        fullCanvas,
+        selectionRect.startX, selectionRect.startY,
+        width, height,
+        0, 0,
+        width, height
+      );
+      
+      const image = croppedCanvas.toDataURL('image/png');
+      downloadImage(image, `zone_fallback_${new Date().getTime()}.png`);
+      
+      setIsSelectingArea(false);
+      setSelectionRect(null);
+    });
+  };
+  
+  return (//
     <div className="relative w-full h-full overflow-hidden bg-slate-100 dark:bg-slate-900">
       {/* Conteneur principal de la carte Leaflet */}
       <div 
         ref={mapRef} 
         className="z-0 w-full h-full"
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={() => {
+          // Annuler la sélection si la souris quitte la carte
+          /*if (isSelectingArea && selectionRect) {
+            setSelectionRect(null);
+          }*/
+        }}
+        style={{ 
+          cursor: isSelectingArea ? 'crosshair' : 'grab' 
+        }}
       />
 
       {/* ConfirmDialog */}
@@ -846,15 +1763,6 @@ const Map2D = () => {
         </Button>
       </div>
 
-      {/* Barre d'outils principale */}
-      <div className="absolute z-[1000] flex flex-col gap-2 top-14 right-4">
-        <Button onClick={toggleFullscreen} size="icon" variant="outline">
-          <Fullscreen className="w-4 h-4" />
-        </Button>
-        <Button onClick={resetView} size="icon" variant="outline">
-          <Compass className="w-4 h-4" />
-        </Button>
-      </div>
 
       {/* Barre de recherche */}
       <AnimatePresence>
@@ -943,6 +1851,113 @@ const Map2D = () => {
       {/* Indicateur de coordonnées */}
       <div className="absolute z-[1000] px-2 py-1 text-xs text-white rounded bottom-5 right-20 bg-black/70">
         {viewport.center[0].toFixed(4)}, {viewport.center[1].toFixed(4)} | Zoom: {viewport.zoom}
+      </div>
+
+      {/* Rectangle de sélection */}
+      {isSelectingArea && selectionRect && (
+        <div
+          style={{
+            position: 'absolute',
+            left: Math.min(selectionRect.startX, selectionRect.endX),
+            top: Math.min(selectionRect.startY, selectionRect.endY),
+            width: Math.abs(selectionRect.endX - selectionRect.startX),
+            height: Math.abs(selectionRect.endY - selectionRect.startY),
+            border: '2px dashed #3b82f6',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            zIndex: 1000,
+            pointerEvents: 'none',
+            cursor: 'crosshair'
+          }}
+          className="flex items-center justify-center"
+        >
+          <span className="px-2 py-1 text-xs font-medium text-blue-600 rounded bg-white/80">
+            {Math.abs(selectionRect.endX - selectionRect.startX)} × {Math.abs(selectionRect.endY - selectionRect.startY)} px
+          </span>
+        </div>
+      )}
+
+      {/* Barre d'outils principale */}
+      <div className="absolute z-[1000] flex flex-col gap-2 top-14 right-4">
+        {/* Bouton capture complète */}
+        <Button 
+          onClick={captureFullMap} 
+          //onClick={captureFullMapEP} 
+          size="icon" 
+          variant="outline" 
+          title="Capturer toute la carte"
+          disabled={isSelectingArea}
+        >
+          <Camera className="w-4 h-4" />
+        </Button>
+        
+        {/* Bouton capture zone */}
+        <Button 
+          onClick={() => {
+            if (isSelectingArea) {
+              cancelAreaSelection();
+            } else {
+              startAreaSelection();
+            }
+          }}
+          size="icon" 
+          variant={isSelectingArea ? "default" : "outline"}
+          title={isSelectingArea ? "Annuler la sélection" : "Sélectionner une zone à capturer"}
+        >
+          <Crop className="w-4 h-4" />
+        </Button>
+        
+        {/* Bouton pour capturer la zone sélectionnée */}
+        {isSelectingArea && selectionRect && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="absolute right-0 top-16"
+          >
+            <Card className="p-2">
+              <CardContent className="p-0">
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs font-medium text-center">
+                    Zone sélectionnée
+                  </p>
+                  <Button 
+                    onClick={captureSelectedArea}
+                    size="sm" 
+                    variant="default"
+                    className="text-xs"
+                  >
+                    Capturer cette zone
+                  </Button>
+                  <Button 
+                    onClick={cancelAreaSelection}
+                    size="sm" 
+                    variant="outline"
+                    className="text-xs"
+                  >
+                    Annuler
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+        
+        {/* Vos boutons existants */}
+        <Button 
+          onClick={toggleFullscreen} 
+          size="icon" 
+          variant="outline"
+          disabled={isSelectingArea}
+        >
+          <Fullscreen className="w-4 h-4" />
+        </Button>
+        <Button 
+          onClick={resetView} 
+          size="icon" 
+          variant="outline"
+          disabled={isSelectingArea}
+        >
+          <Compass className="w-4 h-4" />
+        </Button>
       </div>
     </div>
   );

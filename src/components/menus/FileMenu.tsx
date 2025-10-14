@@ -434,9 +434,11 @@ const FileMenu = () => {
             const file = target.files?.[0];
             if (file) {
                 const maxSize = maxMo * 1024 * 1024;
+                const maxSize = maxMo * 1024 * 1024;
                 if (file.size > maxSize) {
                     toast({
                         title: "Fichier trop volumineux",
+                        description: `Le fichier fait ${formatFileSize(file.size)}. La taille maximale autorisée est de ${maxMo} MB.`,
                         description: `Le fichier fait ${formatFileSize(file.size)}. La taille maximale autorisée est de ${maxMo} MB.`,
                         variant: "destructive"
                     });
