@@ -32,6 +32,7 @@ export interface Plot {
 
 export interface PlotState {
     plots: Plot[];
+    plotsForDD: Plot[],
     currentPlot: Plot | null;
     loading: boolean;
     error: string | null;
@@ -56,6 +57,7 @@ export interface PlotState {
 
 const initialState: PlotState = {
     plots: [],
+    plotsForDD: [],
     currentPlot: null,
     loading: false,
     error: null,
@@ -75,6 +77,31 @@ const initialState: PlotState = {
 // Async thunks based on plotController endpoints
 export const fetchPlots = createAsyncThunk(
     'plots/fetchPlots',
+    async (params: {
+        search?: string;
+        page?: number;
+        limit?: number;
+        region?: string;
+        city?: string;
+        departement?: string;
+        district?: string;
+        place?: string;
+        status?: string;
+        sortBy?: string;
+        sortOrder?: "ASC" | "DESC";
+    } = {}) => {
+        try {
+            const response = await axios.get('/plots', { params });
+            return response.data;
+        } catch (err) {
+            console.log("GET PLOTS ERROR     ", err);
+            return null;
+        } 
+    }
+);
+
+export const fetchDropdownPlots = createAsyncThunk(
+    'plots/fetchDropdownPlots',
     async (params: {
         search?: string;
         page?: number;
@@ -202,6 +229,22 @@ const plotSlice = createSlice({
                 state.loading = false;
                 state.error = action.error.message || 'Failed to fetch plots';
             });
+        
+        
+        // Fetch plots for dropdown
+        builder
+        .addCase(fetchDropdownPlots.pending, (state) => {
+            state.loading = true;
+            state.error = null;
+        })
+        .addCase(fetchDropdownPlots.fulfilled, (state, action) => {
+            state.loading = false;
+            state.plotsForDD = action.payload.data || action.payload;
+        })
+        .addCase(fetchDropdownPlots.rejected, (state, action) => {
+            state.loading = false;
+            state.error = action.error.message || 'Failed to fetch plots';
+        });
 
         // Fetch plot by code
         builder

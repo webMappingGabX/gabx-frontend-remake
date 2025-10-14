@@ -1,6 +1,14 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from "@reduxjs/toolkit";
 import axios from "../../../api/axios";
 
+type AxiosErrorResponse = {
+    response?: {
+      data?: {
+        message?: string;
+      };
+    };
+  };
+
 // Types based on HousingEstate model
 export interface HousingEstate {
     id?: number;
@@ -46,6 +54,8 @@ export interface HousingEstateState {
     currentStats: HousingEstateStats | null;
     loading: boolean;
     error: string | null;
+    hasPlan : boolean;
+    hasOrtho : boolean;
     pagination: {
         page: number;
         limit: number;
@@ -71,6 +81,8 @@ const initialState: HousingEstateState = {
     currentStats: null,
     loading: false,
     error: null,
+    hasPlan : false,
+    hasOrtho : false,
     pagination: {
         page: 1,
         limit: 10,
@@ -181,6 +193,34 @@ export const fetchHousingEstatesByRegion = createAsyncThunk(
     async (region: string) => {
         const response = await axios.get(`/housing-estates/region/${region}`);
         return response.data;
+    }
+);
+
+export const hasMassPlan = createAsyncThunk(
+    'housingEstates/hasMassPlan',
+    async (id : number, { rejectWithValue }) => {
+        try{
+            const response = await axios.get(`/housing-estates/${id}/has-plan`);
+            return response.data;
+        } catch (error : unknown) {
+            console.log("HAS MASS PLAN ERROR     ", error);
+            const axiosError = error as AxiosErrorResponse;
+            return rejectWithValue(axiosError.response?.data?.message || 'Erreur de connexion au serveur');
+        }
+    }
+);
+
+export const hasOrthoPhoto = createAsyncThunk(
+    'housingEstates/hasOrthoPhoto',
+    async (id : number, { rejectWithValue }) => {
+        try{
+            const response = await axios.get(`/housing-estates/${id}/has-ortho`);
+            return response.data;
+        } catch (error : unknown) {
+            console.log("HAS ORTHO PLAN ERROR     ", error);
+            const axiosError = error as AxiosErrorResponse;
+            return rejectWithValue(axiosError.response?.data?.message || 'Erreur de connexion au serveur');
+        }
     }
 );
 
@@ -363,6 +403,36 @@ const housingEstateSlice = createSlice({
                 state.loading = false;
                 state.error = action.error.message || 'Failed to fetch housing estates by region';
             });
+        
+        // hasMassPlan
+        builder
+            .addCase(hasMassPlan.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(hasMassPlan.fulfilled, (state, action) => {
+                state.loading = false;
+                state.hasPlan = action.payload.hasPlan;
+            })
+            .addCase(hasMassPlan.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.error.message || 'Failed to fetch has mass plan';
+            });
+        
+        // hasOrthoPhoto
+        builder
+            .addCase(hasOrthoPhoto.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(hasOrthoPhoto.fulfilled, (state, action) => {
+                state.loading = false;
+                state.hasOrtho = action.payload.hasOrtho;
+            })
+            .addCase(hasOrthoPhoto.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.error.message || 'Failed to fetch has ortho photo';
+            });
     }
 });
 
@@ -386,4 +456,7 @@ export const selectHousingEstatesLoading = (state: { housingEstates: HousingEsta
 export const selectHousingEstatesError = (state: { housingEstates: HousingEstateState }) => state.housingEstates.error;
 export const selectHousingEstatesPagination = (state: { housingEstates: HousingEstateState }) => state.housingEstates.pagination;
 export const selectHousingEstatesFilters = (state: { housingEstates: HousingEstateState }) => state.housingEstates.filters;
+
+export const selectHEHasMassPlan = (state: { housingEstates: HousingEstateState }) => state.housingEstates.hasPlan;
+export const selectHEHasOrthoPhoto = (state: { housingEstates: HousingEstateState }) => state.housingEstates.hasOrtho;
 
