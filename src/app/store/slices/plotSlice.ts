@@ -108,9 +108,15 @@ export const fetchPlotById = createAsyncThunk(
 
 export const createPlot = createAsyncThunk(
     'plots/createPlot',
-    async (plotData: Omit<Plot, 'id' | 'createdAt' | 'updatedAt'>) => {
-        const response = await axios.post('/plots', plotData);
-        return response.data;
+    async (plotData: Omit<Plot, 'id' | 'createdAt' | 'updatedAt'>, { rejectWithValue }) => {
+        try {
+            const response = await axios.post('/plots', plotData);
+            return response.data;
+        } catch (error) {
+            console.log("ERROR CREATING PLOT", error);
+            const axiosError = error;
+            return rejectWithValue(axiosError.response?.data?.message || 'Erreur de connexion au serveur');
+        }
     }
 );
 

@@ -74,7 +74,7 @@ const FileMenu = () => {
     const districtsFromStates = useSelector(selectArrondState);
     const townsFromStates = useSelector(selectTownsState);
 
-    const maxMo = 7;
+    const maxMo = 10;
     // Use Effect
     useEffect(() => {
         const loadRegions = async () => {
@@ -289,6 +289,7 @@ const FileMenu = () => {
             }
             const response = await dispatch(createHousingEstate(datas));
             
+            console.log("RESPONSE CREATING HE", response);
             if(response.type.includes("rejected"))
             {
                 throw new Error('Erreur lors de l\'envoi des données');
@@ -330,6 +331,7 @@ const FileMenu = () => {
 
                 const response = await dispatch(createPlot(updatedFeature));
                 
+                console.log("CREATING PLOT RESPONSE", response);
                 if(response.type.includes("rejected"))
                 {
                     throw new Error('Erreur lors de l\'envoi des données');

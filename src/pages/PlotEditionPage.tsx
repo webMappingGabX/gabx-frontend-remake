@@ -680,7 +680,7 @@ const PlotEditionPage = ({ onCancel, onSuccess }: PlotEditionPageProps) => {
                             <Button type="submit" className="cursor-pointer" disabled={isLoading}>
                                 {isLoading ? "Enregistrement..." : (editingMode ? "Mettre à jour" : "Créer")}
                             </Button>
-                            <Button type="button" variant="outline" onClick={cancelForm} className="cursor-pointer" disabled={isLoading} className="cursor-pointer">
+                            <Button type="button" variant="outline" onClick={cancelForm} className="cursor-pointer" disabled={isLoading}>
                                 Annuler
                             </Button>
                         </div>
