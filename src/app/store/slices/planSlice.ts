@@ -12,6 +12,7 @@ export interface Plan {
     updatedAt?: string;
 }
 
+
 export interface PlanState {
     plans: Plan[];
     plansForDD: Plan[],
@@ -104,7 +105,21 @@ export const createPlan = createAsyncThunk(
             const response = await axios.post('/plans', planData);
             return response.data;
         } catch (error) {
-            console.log("ERROR CREATING PLOT", error);
+            console.log("ERROR CREATING PLAN", error);
+            const axiosError = error;
+            return rejectWithValue(axiosError.response?.data?.message || 'Erreur de connexion au serveur');
+        }
+    }
+);
+
+export const createBuilding = createAsyncThunk(
+    'plans/createBuilding',
+    async (buildingData: Omit<Plan, 'id' | 'createdAt' | 'updatedAt'>, { rejectWithValue }) => {
+        try {
+            const response = await axios.post('/plans/building', buildingData);
+            return response.data;
+        } catch (error) {
+            console.log("ERROR CREATING BUILDING", error);
             const axiosError = error;
             return rejectWithValue(axiosError.response?.data?.message || 'Erreur de connexion au serveur');
         }
@@ -257,6 +272,20 @@ const planSlice = createSlice({
             .addCase(deletePlan.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.error.message || 'Failed to delete plan';
+            });
+        
+        // create building
+        builder
+            .addCase(createBuilding.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(createBuilding.fulfilled, (state, action) => {
+                state.loading = false;
+            })
+            .addCase(createBuilding.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.error.message || 'Failed to create building';
             });
     }
 });

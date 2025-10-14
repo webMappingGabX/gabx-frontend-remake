@@ -1,4 +1,4 @@
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, number } from "framer-motion";
 import { Card, CardContent } from "../ui/card";
 import { Button } from "../ui/button";
 import { Download, File, X, Save, Building, Map, Satellite, Layers } from "lucide-react";
@@ -9,10 +9,11 @@ import { useEffect, useState } from "react";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "../ui/select";
-import { createHousingEstate, fetchHousingEstates, selectHEHasMassPlan, selectHEHasOrthoPhoto, selectHousingEstates } from "../../app/store/slices/housingEstateSlice";
+import { createHousingEstate, fetchHousingEstates, hasMassPlan, hasOrthoPhoto, selectHEHasMassPlan, selectHEHasOrthoPhoto, selectHousingEstates } from "../../app/store/slices/housingEstateSlice";
 import { createPlot, fetchPlots, selectPlots, selectPlotsFilters } from "../../app/store/slices/plotSlice";
 import { getArronds, getDepts, getRegions, getTowns, selectArrondState, selectDeptState, selectRegionsState, selectTokens, selectTownsState } from "../../app/store/slices/authSlice";
 import { Separator } from "@radix-ui/react-dropdown-menu";
+import { createBuilding, createPlan } from "../../app/store/slices/planSlice";
 
 interface GeoJsonInformations {
     name: string;
@@ -34,28 +35,9 @@ interface HousingEstateFormData {
     buildingsType: 'COLLECTIVE' | 'INDIVIDUAL';
 }
 
-interface FeatureData {
-    code: string;
-    geom: Record<string, unknown>;
-    region?: string;
-    town?: string;
-    department?: string;
-    arrondissement?: string;
-    place?: string;
-    TFnumber?: string;
-    acquiredYear?: number;
-    classification?: number;
-    area?: number;
-    price?: number;
-    marketValue?: number;
-    observations?: string;
-    status?: "BATI" | "NON BATI";
-    housingEstateId?: number;
-}
-
 interface PlotFormData {
     housingEstateId: string;
-    type: 'MASSE' | 'ORTHOPHOTO' | 'CUSTOM';
+    type: 'PLAN_DE_MASSE' | 'ORTHO_PHOTO' | 'PERSO';
     area?: number;
     TFnumber?: string;
     acquiredYear?: number;
@@ -69,6 +51,24 @@ interface PlotFormData {
     max?: number;
 }
 
+interface PlotData {
+    housingEstateId: number;
+    type: 'PLAN_DE_MASSE' | 'ORTHO_PHOTO' | 'PERSO';
+    area?: number;
+    TFnumber?: string;
+    acquiredYear?: number;
+    classification?: number;
+    plotArea?: number;
+    price?: number;
+    marketValue?: number;
+    observations?: string;
+    status?: "BATI" | "NON BATI";
+    buildings?: any[];
+    max?: number;
+    geom: Record<string, unknown>;
+    code: string;
+}
+
 const FileMenu = () => {
     const dispatch = useDispatch();
     const { toast } = useToast();
@@ -77,7 +77,7 @@ const FileMenu = () => {
     const [showHousingEstateForm, setShowHousingEstateForm] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [selectedHousingEstate, setSelectedHousingEstate] = useState<string>("");
-    const [importType, setImportType] = useState<'MASSE' | 'ORTHOPHOTO' | 'CUSTOM' | null>(null);
+    const [importType, setImportType] = useState<'PLAN_DE_MASSE' | 'ORTHO_PHOTO' | 'PERSO' | null>(null);
     
     const [housingEstateForm, setHousingEstateForm] = useState<HousingEstateFormData>({
         name: "",
@@ -91,7 +91,7 @@ const FileMenu = () => {
 
     const [plotForm, setPlotForm] = useState<PlotFormData>({
         housingEstateId: '',
-        type: 'MASSE',
+        type: 'PLAN_DE_MASSE',
         area: undefined,
         TFnumber: '',
         acquiredYear: undefined,
@@ -166,6 +166,38 @@ const FileMenu = () => {
         loadTowns();
     }, [housingEstateForm.arrondissement]);
 
+    const checkHasMassPlan = async (id : number) => {
+        const response = await dispatch(hasMassPlan(id));
+
+        console.log("HAS MAS PLANE RESPONSE", response);
+    }
+
+    const checkHasOrthoPhoto = async (id : number) => {
+        const response = await dispatch(hasOrthoPhoto(id));
+
+        console.log("HAS ORTHO PHOTO RESPONSE", response);
+    }
+
+    // Mettre à jour l'état des plans existants quand la cité sélectionnée change
+    useEffect(() => {
+        if (selectedHousingEstate && selectedHousingEstate !== "new") {
+            const id = parseInt(selectedHousingEstate);
+
+            checkHasMassPlan(id);
+            checkHasOrthoPhoto(id);
+        }
+
+
+    }, [selectedHousingEstate]);
+
+    useEffect(() => {
+        setHasExistingMassePlan(selectHasMassPlan);
+    }, [selectHasMassPlan]);
+
+    useEffect(() => {
+        setHasExistingOrthophoto(selectHasOrthoPhoto);
+    }, [selectHasOrthoPhoto]);
+
     // Helper function to format file size
     const formatFileSize = (bytes: number): string => {
         if (bytes === 0) return '0 Bytes';
@@ -236,65 +268,40 @@ const FileMenu = () => {
         };
     };
 
-    // Fonction pour extraire les données des features
-    const extractFeaturesData = (geojson: Record<string, unknown>): FeatureData[] => {
-        const features: FeatureData[] = [];
+    // Convert MultiPolygon geometry to Polygon geometry by extracting its first polygon
+    const multiPolygonToPolygon = (geometry: Record<string, any>): Record<string, any> => {
+        if (!geometry) return geometry;
+        if (geometry.type === "MultiPolygon" && Array.isArray(geometry.coordinates) && geometry.coordinates.length > 0) {
+            // Use the first polygon in the MultiPolygon
+            return {
+                type: "Polygon",
+                coordinates: geometry.coordinates[0]
+            };
+        }
+        return geometry;
+    };
+
+    // Fonction pour extraire les polygones des features
+    const extractPolygonsFromGeoJSON = (geojson: Record<string, unknown>): any[] => {
+        const polygons: any[] = [];
         
         if (geojson.type === 'FeatureCollection' && Array.isArray(geojson.features)) {
             geojson.features.forEach((feature: Record<string, unknown>) => {
-                const properties = (feature.properties as Record<string, unknown>) || {};
-                const geometry = feature.geometry;
+                const geometry = feature.geometry as Record<string, unknown>;
                 
-                if (geometry) {
-                    const featureData: FeatureData = {
-                        code: (properties.code as string) || generateUniqueCode(),
-                        geom: convertToGeometryCollection(geometry as Record<string, unknown>),
-                        region: (properties.regionId as string) || undefined,
-                        town: (properties.townId as string) || undefined,
-                        department: (properties.departmentId as string) || undefined,
-                        arrondissement: (properties.arrondissementId as string) || undefined,
-                        place: (properties.place as string) || undefined,
-                        TFnumber: (properties.TFnumber as string) || (properties.tfnumber as string) || undefined,
-                        acquiredYear: (properties.acquiredYear as number) || (properties.year as number) || undefined,
-                        classification: (properties.classification as number) || undefined,
-                        area: (properties.area as number) || undefined,
-                        price: (properties.price as number) || undefined,
-                        marketValue: (properties.marketValue as number) || (properties.market_value as number) || undefined,
-                        observations: (properties.observations as string) || undefined,
-                        status: (properties.status as "BATI" | "NON BATI") || undefined,
-                        housingEstateId: undefined
-                    };
-                    features.push(featureData);
+                if (geometry && (geometry.type === 'Polygon' || geometry.type === 'MultiPolygon')) {
+                    polygons.push(geometry);
                 }
             });
         } else if (geojson.type === 'Feature') {
-            const properties = (geojson.properties as Record<string, unknown>) || {};
-            const geometry = geojson.geometry;
+            const geometry = geojson.geometry as Record<string, unknown>;
             
-            if (geometry) {
-                const featureData: FeatureData = {
-                    code: (properties.code as string) || generateUniqueCode(),
-                    geom: convertToGeometryCollection(geometry as Record<string, unknown>),
-                    region: (properties.regionId as string) || undefined,
-                    town: (properties.townId as string) || undefined,
-                    department: (properties.departmentId as string) || undefined,
-                    arrondissement: (properties.arrondissementId as string) || undefined,
-                    place: (properties.place as string) || undefined,
-                    TFnumber: (properties.TFnumber as string) || (properties.tfnumber as string) || undefined,
-                    acquiredYear: (properties.acquiredYear as number) || (properties.year as number) || undefined,
-                    classification: (properties.classification as number) || undefined,
-                    area: (properties.area as number) || undefined,
-                    price: (properties.price as number) || undefined,
-                    marketValue: (properties.marketValue as number) || (properties.market_value as number) || undefined,
-                    observations: (properties.observations as string) || undefined,
-                    status: (properties.status as "BATI" | "NON BATI") || undefined,
-                    housingEstateId: undefined
-                };
-                features.push(featureData);
+            if (geometry && (geometry.type === 'Polygon' || geometry.type === 'MultiPolygon')) {
+                polygons.push(geometry);
             }
         }
         
-        return features;
+        return polygons;
     };
 
     // Fonction pour créer un housing estate via l'API
@@ -307,6 +314,7 @@ const FileMenu = () => {
                 arrondissementId: formData.arrondissement,
                 townId: formData.town
             }
+            console.log("CREATING DATAS", datas);
             const response = await dispatch(createHousingEstate(datas));
             
             console.log("RESPONSE CREATING HE", response);
@@ -327,58 +335,59 @@ const FileMenu = () => {
         }
     };
 
-    // Fonction pour envoyer les features à l'API
-    const sendFeaturesToAPI = async (features: FeatureData[], housingEstateId: string | null = null, housingEstateData: HousingEstateFormData | null = null) => {
+    // Fonction pour envoyer le plot à l'API
+    const sendPlotToAPI = async (plotData: PlotData) => {
         try {
-            const results = [];
+
+            const { buildings, geom, ...planData } = plotData;
+
+            console.log("PLAN DATA SENT", planData);
+            //const response = await dispatch(createPlan(plotData));
+            const response = await dispatch(createPlan(planData));
             
-            for (const feature of features) {
-                const updatedFeature = {
-                    ...feature,
-                    housingEstateId: housingEstateId ? parseInt(housingEstateId) : feature.housingEstateId,
-                    type: importType,
-                    ...plotForm
-                };
+            console.log("CREATING PLAN RESPONSE", response);
+            if(response.type.includes("fulfilled")) {
+                const plotId = response.payload.data.plots[0].id;
 
-                // Si un housing estate est spécifié, reporter ses attributs sur les features enfants
-                if (housingEstateId && housingEstateData) {
-                    updatedFeature.regionId = housingEstateData.region || feature.region;
-                    updatedFeature.departmentId = housingEstateData.department || feature.department;
-                    updatedFeature.arrondissementId = housingEstateData.arrondissement || feature.arrondissement;
-                    updatedFeature.townId = housingEstateData.town || feature.town;
-                    updatedFeature.place = housingEstateData.place || feature.place;
+                let total = 0;
+                for (const building of buildings ?? []) {
+                    const buildingData = {
+                        plotId,
+                        geom: multiPolygonToPolygon(building)   
+                    }
+
+                    const response2 = await dispatch(createBuilding(buildingData));
                 }
-
-                const response = await dispatch(createPlot(updatedFeature));
-                
-                console.log("CREATING PLOT RESPONSE", response);
-                if(response.type.includes("rejected"))
-                {
-                    throw new Error('Erreur lors de l\'envoi des données');
-                }
-
-                results.push(response.payload);
             }
 
-            return results;
+            if(response.type.includes("rejected"))
+            {
+                throw new Error('Erreur lors de l\'envoi des données');
+            }
+
+            return response.payload;
         } catch (error) {
-            console.error('Erreur lors de l\'envoi des features:', error);
+            console.error('Erreur lors de l\'envoi du plot:', error);
             throw error;
         }
     };
 
     // Fonction pour sauvegarder les données
     const handleSaveData = async () => {
-        if (!geojsonData) return;
+        if (!geojsonData || !importType) return;
 
         setIsSubmitting(true);
         try {
-            const features = extractFeaturesData(geojsonData);
             let housingEstateId: string | null = selectedHousingEstate;
 
             // Si le formulaire housing estate est rempli, on le crée d'abord
-            if (showHousingEstateForm && 
-                (housingEstateForm.region || housingEstateForm.town || housingEstateForm.department)) {
+            /*if (showHousingEstateForm && 
+                (housingEstateForm.region || housingEstateForm.town || housingEstateForm.department)) {*/
+            console.log("HE ID", housingEstateId, "     SELECTED HE", selectedHousingEstate);
+            console.log("SHOW HE", showHousingEstateForm);
+            console.log("IS NUMBER", !Number.isInteger(Number(selectedHousingEstate)));
+            
+            if (!Number.isInteger(Number(selectedHousingEstate))) {
                 
                 housingEstateId = await createHE(housingEstateForm);
                 if (!housingEstateId) {
@@ -387,12 +396,45 @@ const FileMenu = () => {
                 }
             }
 
-            // Envoi des features à l'API
-            await sendFeaturesToAPI(features, housingEstateId, showHousingEstateForm ? housingEstateForm : null);
+            if (!housingEstateId) {
+                toast({
+                    title: "Erreur",
+                    description: "Aucune cité sélectionnée",
+                    variant: "destructive"
+                });
+                setIsSubmitting(false);
+                return;
+            }
+
+            // Extraire les polygones pour les bâtiments
+            const buildings = extractPolygonsFromGeoJSON(geojsonData);
+            
+            // Préparer les données du plot selon le format attendu par l'API
+            const plotData: PlotData = {
+                housingEstateId: parseInt(housingEstateId),
+                type: importType,
+                area: plotForm.area,
+                TFnumber: plotForm.TFnumber || undefined,
+                acquiredYear: plotForm.acquiredYear,
+                classification: plotForm.classification,
+                plotArea: plotForm.plotArea,
+                price: plotForm.price,
+                marketValue: plotForm.marketValue,
+                observations: plotForm.observations || undefined,
+                status: plotForm.status,
+                buildings: buildings,
+                max: plotForm.max,
+                //geom: convertToGeometryCollection(geojsonData),
+                geom: geojsonData,
+                code: generateUniqueCode()
+            };
+
+            // Envoi du plot à l'API
+            await sendPlotToAPI(plotData);
             
             toast({
                 title: "Succès",
-                description: `${features.length} feature(s) ont été sauvegardées avec succès`,
+                description: `${getImportTypeLabel(importType)} a été sauvegardé avec succès`,
                 variant: "default"
             });
 
@@ -410,6 +452,21 @@ const FileMenu = () => {
                 place: '',
                 buildingsType: 'COLLECTIVE'
             });
+            setPlotForm({
+                housingEstateId: '',
+                type: 'PLAN_DE_MASSE',
+                area: undefined,
+                TFnumber: '',
+                acquiredYear: undefined,
+                classification: undefined,
+                plotArea: undefined,
+                price: undefined,
+                marketValue: undefined,
+                observations: '',
+                status: undefined,
+                buildings: [],
+                max: 200
+            });
 
         } catch (error) {
             console.log("ERROR", error);
@@ -423,7 +480,7 @@ const FileMenu = () => {
         }
     };
 
-    const handleImportGeoJson = (type: 'MASSE' | 'ORTHOPHOTO' | 'CUSTOM') => {
+    const handleImportGeoJson = (type: 'PLAN_DE_MASSE' | 'ORTHO_PHOTO' | 'PERSO') => {
         setImportType(type);
         
         const input = document.createElement('input');
@@ -434,11 +491,9 @@ const FileMenu = () => {
             const file = target.files?.[0];
             if (file) {
                 const maxSize = maxMo * 1024 * 1024;
-                const maxSize = maxMo * 1024 * 1024;
                 if (file.size > maxSize) {
                     toast({
                         title: "Fichier trop volumineux",
-                        description: `Le fichier fait ${formatFileSize(file.size)}. La taille maximale autorisée est de ${maxMo} MB.`,
                         description: `Le fichier fait ${formatFileSize(file.size)}. La taille maximale autorisée est de ${maxMo} MB.`,
                         variant: "destructive"
                     });
@@ -514,18 +569,13 @@ const FileMenu = () => {
         }));
     };
 
-    const getImportTypeLabel = (type: 'MASSE' | 'ORTHOPHOTO' | 'CUSTOM') => {
+    const getImportTypeLabel = (type: 'PLAN_DE_MASSE' | 'ORTHO_PHOTO' | 'PERSO') => {
         switch (type) {
-            case 'MASSE': return 'Plan de masse';
-            case 'ORTHOPHOTO': return 'Orthophoto';
-            case 'CUSTOM': return 'Couche personnalisée';
+            case 'PLAN_DE_MASSE': return 'Plan de masse';
+            case 'ORTHO_PHOTO': return 'Orthophoto';
+            case 'PERSO': return 'Couche personnalisée';
             default: return '';
         }
-    };
-
-    const handleCreateNewHousingEstate = () => {
-        setSelectedHousingEstate("");
-        setShowHousingEstateForm(true);
     };
 
     return (
@@ -558,7 +608,7 @@ const FileMenu = () => {
                                                 value={selectedHousingEstate}
                                                 onValueChange={(value) => {
                                                     setSelectedHousingEstate(value);
-                                                    setShowHousingEstateForm(false);
+                                                    if(value !== "new") setShowHousingEstateForm(false);
                                                 }}
                                             >
                                                 <SelectTrigger className="w-full">
@@ -691,7 +741,7 @@ const FileMenu = () => {
                                                 <Button
                                                     variant={hasExistingMassePlan ? "destructive" : "default"}
                                                     className="flex flex-row cursor-pointer"
-                                                    onClick={() => handleImportGeoJson('MASSE')}
+                                                    onClick={() => handleImportGeoJson('PLAN_DE_MASSE')}
                                                     disabled={!selectedHousingEstate && !showHousingEstateForm}
                                                 >
                                                     <Map className="w-4 h-4 mr-2" />
@@ -702,7 +752,7 @@ const FileMenu = () => {
                                                 <Button
                                                     variant={hasExistingOrthophoto ? "destructive" : "default"}
                                                     className="flex flex-row cursor-pointer"
-                                                    onClick={() => handleImportGeoJson('ORTHOPHOTO')}
+                                                    onClick={() => handleImportGeoJson('ORTHO_PHOTO')}
                                                     disabled={!selectedHousingEstate && !showHousingEstateForm}
                                                 >
                                                     <Satellite className="w-4 h-4 mr-2" />
@@ -713,7 +763,7 @@ const FileMenu = () => {
                                                 <Button
                                                     variant="outline"
                                                     className="flex flex-row cursor-pointer"
-                                                    onClick={() => handleImportGeoJson('CUSTOM')}
+                                                    onClick={() => handleImportGeoJson('PERSO')}
                                                     disabled={!selectedHousingEstate && !showHousingEstateForm}
                                                 >
                                                     <Layers className="w-4 h-4 mr-2" />
@@ -724,7 +774,7 @@ const FileMenu = () => {
                                     )}
                                 </div>
 
-                                {importedFile ? (
+                                {importedFile && (
                                     <div className="mb-4 mt-2">
                                         <h2 className="mb-2 font-semibold text-md">Informations du fichier importé</h2>
                                         <ul className="text-sm text-gray-700 dark:text-gray-300">
@@ -751,7 +801,7 @@ const FileMenu = () => {
                                                     <Input
                                                         type="number"
                                                         value={plotForm.acquiredYear || ''}
-                                                        onChange={(e) => handlePlotFormChange('acquiredYear', parseInt(e.target.value))}
+                                                        onChange={(e) => handlePlotFormChange('acquiredYear', parseInt(e.target.value) || undefined)}
                                                     />
                                                 </div>
                                                 <div className="space-y-2">
@@ -759,31 +809,39 @@ const FileMenu = () => {
                                                     <Input
                                                         type="number"
                                                         value={plotForm.classification || ''}
-                                                        onChange={(e) => handlePlotFormChange('classification', parseInt(e.target.value))}
+                                                        onChange={(e) => handlePlotFormChange('classification', parseInt(e.target.value) || undefined)}
                                                     />
                                                 </div>
                                                 <div className="space-y-2">
-                                                    <Label>Surface</Label>
+                                                    <Label>Surface (m²)</Label>
                                                     <Input
                                                         type="number"
                                                         value={plotForm.area || ''}
-                                                        onChange={(e) => handlePlotFormChange('area', parseFloat(e.target.value))}
+                                                        onChange={(e) => handlePlotFormChange('area', parseFloat(e.target.value) || undefined)}
                                                     />
                                                 </div>
                                                 <div className="space-y-2">
-                                                    <Label>Prix</Label>
+                                                    <Label>Surface parcelle (m²)</Label>
+                                                    <Input
+                                                        type="number"
+                                                        value={plotForm.plotArea || ''}
+                                                        onChange={(e) => handlePlotFormChange('plotArea', parseFloat(e.target.value) || undefined)}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label>Prix (FCFA)</Label>
                                                     <Input
                                                         type="number"
                                                         value={plotForm.price || ''}
-                                                        onChange={(e) => handlePlotFormChange('price', parseFloat(e.target.value))}
+                                                        onChange={(e) => handlePlotFormChange('price', parseFloat(e.target.value) || undefined)}
                                                     />
                                                 </div>
                                                 <div className="space-y-2">
-                                                    <Label>Valeur marchande</Label>
+                                                    <Label>Valeur marchande (FCFA)</Label>
                                                     <Input
                                                         type="number"
                                                         value={plotForm.marketValue || ''}
-                                                        onChange={(e) => handlePlotFormChange('marketValue', parseFloat(e.target.value))}
+                                                        onChange={(e) => handlePlotFormChange('marketValue', parseFloat(e.target.value) || undefined)}
                                                     />
                                                 </div>
                                                 <div className="space-y-2 md:col-span-2">
@@ -820,182 +878,6 @@ const FileMenu = () => {
                                             {isSubmitting ? 'Sauvegarde...' : `Sauvegarder ${getImportTypeLabel(importType!)}`}
                                         </Button>
                                     </div>
-                                ) : (
-                                    <>
-                                        {/* <div className="flex flex-col space-y-4">
-                                            <div>
-                                                <h2 className="mb-2 font-semibold">Sélection de la cité</h2>
-                                                <div className="flex flex-col space-y-2">
-                                                    <Select
-                                                        value={selectedHousingEstate}
-                                                        onValueChange={(value) => {
-                                                            setSelectedHousingEstate(value);
-                                                            setShowHousingEstateForm(false);
-                                                        }}
-                                                    >
-                                                        <SelectTrigger className="w-full">
-                                                            <SelectValue placeholder="Sélectionnez une cité" />
-                                                        </SelectTrigger>
-                                                        <SelectContent className="z-[1500]">
-                                                            <SelectGroup>
-                                                                <SelectItem value="new">Créer une nouvelle cité</SelectItem>
-                                                            </SelectGroup>
-                                                            <SelectSeparator />
-                                                            <SelectGroup>
-                                                                {housingEstates?.map((estate: any) => (
-                                                                    <SelectItem key={estate.id} value={estate.id.toString()}>
-                                                                        {estate.name}
-                                                                    </SelectItem>
-                                                                ))}
-                                                            </SelectGroup>
-                                                        </SelectContent>
-                                                    </Select>
-                                                    
-                                                    {selectedHousingEstate === "new" && (
-                                                        <div className="p-4 mt-2 border rounded-md">
-                                                            <h3 className="mb-3 font-semibold">Nouvelle cité</h3>
-                                                            <div className="grid grid-cols-1 gap-3 mb-2">
-                                                                <div className="space-y-2">
-                                                                    <Label>Nom</Label>
-                                                                    <Input
-                                                                        value={housingEstateForm.name}
-                                                                        onChange={(e) => handleHousingEstateFormChange('name', e.target.value)}
-                                                                    />
-                                                                </div>
-                                                            </div>
-                                                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                                                <div className="space-y-2">
-                                                                    <Label>Région</Label>
-                                                                    <Select
-                                                                        value={housingEstateForm.region}
-                                                                        onValueChange={(value) => handleHousingEstateFormChange('region', value)}
-                                                                    >
-                                                                        <SelectTrigger className="w-full">
-                                                                            <SelectValue placeholder="Sélectionnez une région" />
-                                                                        </SelectTrigger>
-                                                                        <SelectContent className="z-[1500] w-full">
-                                                                            {regionsFromState?.map((region) => (
-                                                                                <SelectItem key={region?.id} value={region?.id}>{region?.name}</SelectItem>
-                                                                            ))}
-                                                                        </SelectContent>
-                                                                    </Select>
-                                                                </div>
-                                                                <div className="space-y-2">
-                                                                    <Label>Département</Label>
-                                                                    <Select
-                                                                        value={housingEstateForm.department}
-                                                                        onValueChange={(value) => handleHousingEstateFormChange('department', value)}
-                                                                    >
-                                                                        <SelectTrigger className="w-full">
-                                                                            <SelectValue placeholder="Sélectionnez un département" />
-                                                                        </SelectTrigger>
-                                                                        <SelectContent className="z-[1500] w-full">
-                                                                            {deptsFromStates?.map((dept) => (
-                                                                                <SelectItem key={dept.id} value={dept?.id}>{dept?.name}</SelectItem>
-                                                                            ))}
-                                                                        </SelectContent>
-                                                                    </Select>
-                                                                </div>
-                                                                <div className="space-y-2">
-                                                                    <Label>District</Label>
-                                                                    <Select
-                                                                        value={housingEstateForm.arrondissement}
-                                                                        onValueChange={(value) => handleHousingEstateFormChange('arrondissement', value)}
-                                                                    >
-                                                                        <SelectTrigger className="w-full">
-                                                                            <SelectValue placeholder="Sélectionnez un arrondissement" />
-                                                                        </SelectTrigger>
-                                                                        <SelectContent className="z-[1500] w-full">
-                                                                            {districtsFromStates?.map((arrondissement) => (
-                                                                                <SelectItem key={arrondissement.id} value={arrondissement?.id}>{arrondissement?.name}</SelectItem>
-                                                                            ))}
-                                                                        </SelectContent>
-                                                                    </Select>
-                                                                </div>
-                                                                <div className="space-y-2">
-                                                                    <Label>Ville</Label>
-                                                                    <Select
-                                                                        value={housingEstateForm.town}
-                                                                        onValueChange={(value) => handleHousingEstateFormChange('town', value)}
-                                                                    >
-                                                                        <SelectTrigger className="w-full">
-                                                                            <SelectValue placeholder="Sélectionnez une ville" />
-                                                                        </SelectTrigger>
-                                                                        <SelectContent className="z-[1500] w-full">
-                                                                            {Array.isArray(townsFromStates) && townsFromStates?.map((town) => (
-                                                                                <SelectItem key={town?.id} value={town?.id}>{town?.name}</SelectItem>
-                                                                            ))}
-                                                                        </SelectContent>
-                                                                    </Select>
-                                                                </div>
-                                                                <div className="space-y-2">
-                                                                    <Label>Lieu</Label>
-                                                                    <Input
-                                                                        value={housingEstateForm.place}
-                                                                        onChange={(e) => handleHousingEstateFormChange('place', e.target.value)}
-                                                                    />
-                                                                </div>
-                                                                <div className="space-y-2">
-                                                                    <Label>Type de bâtiment</Label>
-                                                                    <Select
-                                                                        value={housingEstateForm.buildingsType}
-                                                                        onValueChange={(value: 'COLLECTIVE' | 'INDIVIDUAL') => handleHousingEstateFormChange('buildingsType', value)}
-                                                                    >
-                                                                        <SelectTrigger className="w-full">
-                                                                            <SelectValue />
-                                                                        </SelectTrigger>
-                                                                        <SelectContent className="z-[1500] w-full">
-                                                                            <SelectItem value="COLLECTIVE">Collectif</SelectItem>
-                                                                            <SelectItem value="INDIVIDUAL">Individuel</SelectItem>
-                                                                        </SelectContent>
-                                                                    </Select>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            {(selectedHousingEstate || showHousingEstateForm) && (
-                                                <div>
-                                                    <h2 className="mb-2 font-semibold">Importation de données (geojson)</h2>
-                                                    <div className="grid grid-cols-1 gap-2">
-                                                        <Button
-                                                            variant={hasExistingMassePlan ? "destructive" : "default"}
-                                                            className="flex flex-row cursor-pointer"
-                                                            onClick={() => handleImportGeoJson('MASSE')}
-                                                            disabled={!selectedHousingEstate && !showHousingEstateForm}
-                                                        >
-                                                            <Map className="w-4 h-4 mr-2" />
-                                                            {hasExistingMassePlan ? 'Remplacer le plan de masse' : 'Importer le plan de masse'}
-                                                            {hasExistingMassePlan && <span className="ml-2">⚠️</span>}
-                                                        </Button>
-                                                        
-                                                        <Button
-                                                            variant={hasExistingOrthophoto ? "destructive" : "default"}
-                                                            className="flex flex-row cursor-pointer"
-                                                            onClick={() => handleImportGeoJson('ORTHOPHOTO')}
-                                                            disabled={!selectedHousingEstate && !showHousingEstateForm}
-                                                        >
-                                                            <Satellite className="w-4 h-4 mr-2" />
-                                                            {hasExistingOrthophoto ? 'Remplacer l\'orthophoto' : 'Importer l\'orthophoto'}
-                                                            {hasExistingOrthophoto && <span className="ml-2">⚠️</span>}
-                                                        </Button>
-                                                        
-                                                        <Button
-                                                            variant="outline"
-                                                            className="flex flex-row cursor-pointer"
-                                                            onClick={() => handleImportGeoJson('CUSTOM')}
-                                                            disabled={!selectedHousingEstate && !showHousingEstateForm}
-                                                        >
-                                                            <Layers className="w-4 h-4 mr-2" />
-                                                            Importer une couche personnalisée
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div> */}
-                                    </>
                                 )}
                             </div>
                         </div>
