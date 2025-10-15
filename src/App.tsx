@@ -22,6 +22,7 @@ import OSMBuildingsMap from './components/maps/OSMBuildingsMap';
 import UserObservationsPage from './pages/ObservationsPage';
 import DrawableLeafletMap from './components/maps/DrawableLeafletMap';
 import PlotEditionPage from './pages/PlotEditionPage';
+import AdminHousingEstatesPage from './pages/dashboard/AdminHousingEstate';
 
 function App() {
   const { isAuthenticated } = useAuth();
@@ -55,6 +56,7 @@ function App() {
           <Route path='/dashboard' element={<AdminDashboard />} />
           <Route path='/dashboard/users' element={<AdminUsersPage />} />
           <Route path='/dashboard/observations' element={<AdminObservations />} />
+          <Route path='/dashboard/housing-estates' element={<AdminHousingEstatesPage />} />
         </Route>
         
         <Route path='/map' element={

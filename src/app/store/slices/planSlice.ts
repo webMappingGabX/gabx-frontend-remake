@@ -119,7 +119,8 @@ export const createBuilding = createAsyncThunk(
     'plans/createBuilding',
     async (buildingData: Omit<Plan, 'id' | 'createdAt' | 'updatedAt'>, { rejectWithValue }) => {
         try {
-            const response = await axios.post('/plans/building', buildingData);
+            //const response = await axios.post('/plans/building', buildingData);
+            const response = await axios.post('/buildings', buildingData);
             return response.data;
         } catch (error) {
             console.log("ERROR CREATING BUILDING", error);

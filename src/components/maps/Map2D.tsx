@@ -35,7 +35,7 @@ import 'leaflet-easyprint';
 import * as turf from "@turf/turf";
 import ViewMenu from "../menus/ViewMenu";
 import ExportMenu from "../menus/ExportMenu";
-import { fetchBuildings, selectBuildings } from "../../app/store/slices/buildingSlice";
+import { deleteBuilding, fetchBuildings, selectBuildings } from "../../app/store/slices/buildingSlice";
 
 // Icônes personnalisées pour Leaflet (important pour le bon affichage)
 delete (L.Icon.Default.prototype as { _getIconUrl?: string })._getIconUrl;
@@ -377,17 +377,18 @@ const Map2D = () => {
     };
   }, []);
   
-  useEffect(() => {
-    const fetchAndFilterPlots = async () => {
-      //const getPlotsResponses = await dispatch(fetchPlots({ search: searchQuery }));
-      const getPlotsResponses = await dispatch(
-        fetchBuildings({ search: searchQuery, excludeTypes: Array.isArray(selectExcludeTypesFS) ? selectExcludeTypesFS.join(',') : '' })
-      );
-      console.log("GET PLOT RESPONSE", getPlotsResponses);
-      if(getPlotsResponses.type.includes("fulfilled")) {
-        console.log("FULLFILLED PLOTS");
-      }
+  const fetchAndFilterPlots = async () => {
+    //const getPlotsResponses = await dispatch(fetchPlots({ search: searchQuery }));
+    const getPlotsResponses = await dispatch(
+      fetchBuildings({ search: searchQuery, excludeTypes: Array.isArray(selectExcludeTypesFS) ? selectExcludeTypesFS.join(',') : '' })
+    );
+    console.log("GET PLOT RESPONSE", getPlotsResponses);
+    if(getPlotsResponses.type.includes("fulfilled")) {
+      console.log("FULLFILLED PLOTS");
     }
+  }
+  
+  useEffect(() => {
 
     fetchAndFilterPlots();
   }, [searchQuery, selectExcludeTypesFS]);
@@ -695,7 +696,8 @@ const Map2D = () => {
     try {
       if(selectedParcelle)
       {
-        const response = await dispatch(deletePlot(selectedParcelle.code));
+        //const response = await dispatch(deletePlot(selectedParcelle.code));
+        const response = await dispatch(deleteBuilding(selectedParcelle.id));
   
         console.log("DELETE RESPONSE", response);
         if(response.type.includes("fulfilled"))
@@ -706,6 +708,7 @@ const Map2D = () => {
             title: "Parcelle supprimée",
             description: `01 parcelle supprimée avec succès`
           });
+          await fetchAndFilterPlots();
         } else {
           setConfirmPopupVisible(false);
           toast({
@@ -1670,14 +1673,14 @@ const Map2D = () => {
                   <p className="text-sm">Année d'acquisition : {selectedParcelle?.plot?.acquiredYear != null ? selectedParcelle?.plot?.acquiredYear : "Non spécifiée"}</p> */}
                   <p className="text-sm">Etat : {selectedParcelle?.state != null ? selectedParcelle?.state : "Non spécifié"}</p>
                   <p className="text-sm">Nombre de niveaux : {selectedParcelle?.nbLevels != null ? selectedParcelle?.nbLevels : "Non spécifié"}</p>
-                  <p className="text-sm">Cité : {selectedParcelle?.plot?.plan?.housingEstate != null ? selectedParcelle?.plot?.plan?.housingEstate.name : "Aucune"}</p>
+                  <p className="text-sm">Cité : {selectedParcelle?.plot?.housingEstate != null ? selectedParcelle?.plot?.housingEstate.name : "Aucune"}</p>
                   
                   
-                  {selectedParcelle?.plot?.plan?.housingEstate.region != null ? (
+                  {selectedParcelle?.plot?.housingEstate.region != null ? (
                     <ul className="p-2 list-none rounded bg-green-500/15">
-                      <li className="text-sm">Région : {selectedParcelle?.plot?.plan?.housingEstate.region.name}</li>
-                      <li className="text-sm">Département : {selectedParcelle?.plot?.plan?.housingEstate.department != null ? selectedParcelle?.plot?.plan?.housingEstate.department.name : "Non spécifié"}</li>
-                      <li className="text-sm">Arrondissement : {selectedParcelle?.plot?.plan?.housingEstate.arrondissement != null ? selectedParcelle?.plot?.plan?.housingEstate.arrondissement.name : "Non spécifié"}</li>
+                      <li className="text-sm">Région : {selectedParcelle?.plot?.housingEstate.region.name}</li>
+                      <li className="text-sm">Département : {selectedParcelle?.plot?.housingEstate.department != null ? selectedParcelle?.plot?.housingEstate.department.name : "Non spécifié"}</li>
+                      <li className="text-sm">Arrondissement : {selectedParcelle?.plot?.housingEstate.arrondissement != null ? selectedParcelle?.plot?.housingEstate.arrondissement.name : "Non spécifié"}</li>
                     </ul>
                   ) : (
                     <div className="p-2 text-sm rounded bg-green-500/15">

@@ -67,6 +67,12 @@ const DashboardLayout = () => {
       icon: Binoculars,
       isActive: location.pathname.startsWith("/dashboard/observations")
     },
+    {
+      name: "Cités",
+      href: "/dashboard/housing-estates",
+      icon: Binoculars,
+      isActive: location.pathname.startsWith("/dashboard/housing-estates")
+    },
     /*{
       name: "Rapports",
       href: "/admin/reports",

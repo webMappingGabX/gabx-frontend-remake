@@ -110,7 +110,18 @@ const ExportMenu = ({ printControlRef }) => {
       }
     };
 
+    const waitForTilesLoaded = (map) => {
+        return new Promise((resolve) => {
+          if (map._tilesToLoad === 0) {
+            resolve();
+          } else {
+            map.on('load', resolve);
+          }
+        });
+      };
+
       const captureMapImage = async (map: L.Map) => {
+        //await waitForTilesLoaded(map);
         const container = map.getContainer();
       
         const options = {
@@ -336,11 +347,7 @@ const ExportMenu = ({ printControlRef }) => {
             // Exemples d'éléments de légende
             pdf.setFillColor(16, 185, 129); // Vert pour parcelles
             pdf.rect(margin + 5, legendY + 12, 4, 4, 'F');
-            pdf.text("Parcelles", margin + 12, legendY + 15);
-            
-            pdf.setFillColor(245, 158, 66); // Orange pour bâtiments
-            pdf.rect(margin + 45, legendY + 12, 4, 4, 'F');
-            pdf.text("Bâtiments", margin + 52, legendY + 15);
+            pdf.text("Bâtiments", margin + 12, legendY + 15);
             
             pdf.setFillColor(239, 68, 68); // Rouge pour intersections
             pdf.rect(margin + 85, legendY + 12, 4, 4, 'F');

@@ -20,7 +20,7 @@ export enum AvailableMenus {
 const initialState : SettingState = {
     search : false,
     layers : false,
-    overlaps: true,
+    overlaps: false,
     excludeTypes: [],
     test: "HELLO",
     menu : null

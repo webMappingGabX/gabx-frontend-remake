@@ -36,3 +36,15 @@ export const convertToGeometryCollection = (geometry: Record<string, unknown>): 
       geometries: [geometry]
   };
 };
+
+export const multiPolygonToPolygon = (geometry: Record<string, any>): Record<string, any> => {
+  if (!geometry) return geometry;
+  if (geometry.type === "MultiPolygon" && Array.isArray(geometry.coordinates) && geometry.coordinates.length > 0) {
+      // Use the first polygon in the MultiPolygon
+      return {
+          type: "Polygon",
+          coordinates: geometry.coordinates[0]
+      };
+  }
+  return geometry;
+};

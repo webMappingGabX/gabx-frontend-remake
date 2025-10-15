@@ -103,10 +103,24 @@ export const createBuilding = createAsyncThunk(
     }
 );
 
+export const simpleCreateBuilding = createAsyncThunk(
+    'buildings/simpleCreateBuilding',
+    async (buildingData: Omit<Building, 'id' | 'createdAt' | 'updatedAt'>, { rejectWithValue }) => {
+        try {
+            const response = await axios.post('/buildings/simple-create', buildingData);
+            return response.data;
+        } catch (error) {
+            console.log("ERROR CREATING BUILDING", error);
+            const axiosError = error;
+            return rejectWithValue(axiosError.response?.data?.message || 'Erreur de connexion au serveur');
+        }
+    }
+);
+
 export const updateBuilding = createAsyncThunk(
     'buildings/updateBuilding',
-    async ({ code, updateData }: { code: string; updateData: Partial<Building> }) => {
-        const response = await axios.patch(`/buildings/${code}`, updateData);
+    async ({ id, updateData }: { id: string; updateData: Partial<Building> }) => {
+        const response = await axios.patch(`/buildings/${id}`, updateData);
         return response.data;
     }
 );
@@ -152,9 +166,9 @@ const buildingSlice = createSlice({
             })
             .addCase(fetchBuildings.fulfilled, (state, action) => {
                 state.loading = false;
-                state.buildings = action.payload.data || action.payload;
-                if (action.payload.pagination) {
-                    state.pagination = action.payload.pagination;
+                state.buildings = action.payload?.data || action.payload;
+                if (action.payload?.pagination) {
+                    state.pagination = action.payload?.pagination;
                 }
             })
             .addCase(fetchBuildings.rejected, (state, action) => {
@@ -190,6 +204,23 @@ const buildingSlice = createSlice({
                 }
             })
             .addCase(createBuilding.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.error.message || 'Failed to create building';
+            });
+        
+        // Simple Create building
+        builder
+            .addCase(simpleCreateBuilding.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(simpleCreateBuilding.fulfilled, (state, action) => {
+                state.loading = false;
+                if (action.payload.building) {
+                    state.buildings.push(action.payload.building);
+                }
+            })
+            .addCase(simpleCreateBuilding.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.error.message || 'Failed to create building';
             });

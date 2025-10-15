@@ -13,14 +13,18 @@ import { useToast } from "../hooks/useToast";
 import { createPlot, fetchPlotById, selectCurrentPlot, selectPlotsLoading, setCurrentPlot, updatePlot } from "../app/store/slices/plotSlice";
 import { useLocation, useNavigate } from "react-router-dom";
 import DrawableLeafletMap from "../components/maps/DrawableLeafletMap";
-import { convertToGeometryCollection } from "../utils/tools";
+import { convertToGeometryCollection, multiPolygonToPolygon } from "../utils/tools";
 import { PlusCircle } from "lucide-react";
 import HousingEstateFormModal from "../components/modals/HousingEstateFormModal";
+import { simpleCreateBuilding, updateBuilding } from "../app/store/slices/buildingSlice";
+import { createBuilding } from "../app/store/slices/planSlice";
 
 export interface PlotFormData {
     id?: string;
     code: string;
     geom?: Record<string, unknown>;
+    state?: string;
+    nbLevels?: string;
     region: string;
     department: string;
     arrondissement: string;
@@ -46,6 +50,8 @@ interface PlotEditionPageProps {
 const PlotEditionPage = ({ onCancel, onSuccess }: PlotEditionPageProps) => {
     const [formData, setFormData] = useState<PlotFormData>({
         code: "",
+        state: "5",
+        nbLevels: "0",
         region: '',
         department: '',
         arrondissement: "",
@@ -85,15 +91,17 @@ const PlotEditionPage = ({ onCancel, onSuccess }: PlotEditionPageProps) => {
 
     const location = useLocation();
     const editingMode = location.state?.editingMode;
-    // Charger les données de la parcelle si en mode édition
+    // Charger les données du batiment si en mode édition
     
-    // Mettre à jour le formulaire avec les données de la parcelle
+    // Mettre à jour le formulaire avec les données du batiment
     useEffect(() => {
         if (currentPlot) {
             console.log("CURRENT PLOT", currentPlot);
             
             setFormData({
                 code: currentPlot.code || "",
+                state: currentPlot.state || "5",
+                nbLevels: currentPlot.nbLevels || "0",
                 region: currentPlot.regionId?.toString() || "",
                 department: currentPlot.departmentId?.toString() || "",
                 arrondissement: currentPlot.arrondissementId?.toString() || "",
@@ -237,19 +245,31 @@ const PlotEditionPage = ({ onCancel, onSuccess }: PlotEditionPageProps) => {
         
         try {
             console.log("IN EDITING MODE : ", editingMode);
+            console.log("CURRENT pLOT : ", currentPlot);
             if (editingMode) {
                 // Mode édition
-                // await dispatch(updatePlot({ id: currentPlot.id, plotData: formData }) as any);
-                
-                const response = await dispatch(updatePlot({ code: currentPlot?.code, updateData: {
-                    ...formData,
-                    geom: currentEditionFig == null ? null : convertToGeometryCollection(currentEditionFig),
+                const response = await dispatch(updateBuilding({ id: currentPlot?.id, updateData: {
+                    code: formData.code,
+                    state: formData.state,
+                    nbLevels: formData.nbLevels,
+                    geom: currentEditionFig == null ? null : multiPolygonToPolygon(currentEditionFig), //convertToGeometryCollection(currentEditionFig),
                     regionId: formData.region,
                     departmentId: formData.department,
                     arrondissementId: formData.arrondissement,
                     townId: formData.town,
                     housingEstateId: formData.housingEstate
                 } }) as any);
+                // const response = await dispatch(updatePlot({ code: currentPlot?.code, updateData: {
+                //     code: formData.code,
+                //     state: formData.state,
+                //     nbLevels: formData.nbLevels,
+                //     geom: currentEditionFig == null ? null : convertToGeometryCollection(currentEditionFig),
+                //     regionId: formData.region,
+                //     departmentId: formData.department,
+                //     arrondissementId: formData.arrondissement,
+                //     townId: formData.town,
+                //     housingEstateId: formData.housingEstate
+                // } }) as any);
                 
                 if(response.type.includes("fulfilled"))
                 {
@@ -262,15 +282,18 @@ const PlotEditionPage = ({ onCancel, onSuccess }: PlotEditionPageProps) => {
                 } else {
                     toast({
                         title: "Erreur",
-                        description: "Error lors de la mise a jour de la parcelle",
+                        description: "Error lors de la mise a jour du batiment",
                         variant: "destructive"
                     });
                 }
             } else {
                 // Mode création
-                const response = await dispatch(createPlot({
-                    ...formData,
-                    geom: currentEditionFig == null ? null : convertToGeometryCollection(currentEditionFig),
+                //const response = await dispatch(createPlot({
+                const response = await dispatch(simpleCreateBuilding({
+                    code: formData.code,
+                    state: formData.state,
+                    nbLevels: formData.nbLevels,
+                    geom: currentEditionFig == null ? null : multiPolygonToPolygon(currentEditionFig), //convertToGeometryCollection(currentEditionFig),
                     regionId: formData.region,
                     departmentId: formData.department,
                     arrondissementId: formData.arrondissement,
@@ -278,7 +301,6 @@ const PlotEditionPage = ({ onCancel, onSuccess }: PlotEditionPageProps) => {
                     housingEstateId: formData.housingEstate
                 }) as any);
 
-                // console.log("CREATE PLOT RESPONSE", response);
                 if(response.type.includes("fulfilled")) {
                     toast({
                         title: "Succès",
@@ -289,7 +311,7 @@ const PlotEditionPage = ({ onCancel, onSuccess }: PlotEditionPageProps) => {
                 } else {
                     toast({
                         title: "Error",
-                        description: "Erreur pendant la creation de la parcelle"
+                        description: "Erreur pendant la creation du batiment"
                     });
                 }
             }
@@ -322,10 +344,6 @@ const PlotEditionPage = ({ onCancel, onSuccess }: PlotEditionPageProps) => {
                 departmentId: HEFormData.department,
                 arrondissementId: HEFormData.arrondissement,
                 townId: HEFormData.town
-                /*regionId: parseInt(HEFormData.region),
-                departmentId: parseInt(HEFormData.department),
-                arrondissementId: parseInt(HEFormData.arrondissement),
-                townId: parseInt(HEFormData.town)*/
             }
             const response = await dispatch(createHousingEstate(datas));
             
@@ -341,7 +359,6 @@ const PlotEditionPage = ({ onCancel, onSuccess }: PlotEditionPageProps) => {
             
             if(response.type.includes("rejected"))
             {
-                // console.log("CREATE HE RESPONSE", response);
                 toast({
                     title: "Erreur",
                     description: "Impossible de créer la cité",
@@ -391,48 +408,63 @@ const PlotEditionPage = ({ onCancel, onSuccess }: PlotEditionPageProps) => {
             <Card className="m-4">
                 <CardHeader>
                     <CardTitle>
-                        {editingMode ? "Modifier les infos de la parcelle" : "Créer une nouvelle parcelle"}
+                        {editingMode ? "Modifier les infos du batiment" : "Créer une nouvelle batiment"}
                     </CardTitle>
                     <CardDescription>
-                        Remplissez les détails de votre parcelle
+                        Remplissez les détails de votre batiment
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
                     <form onSubmit={handleSubmitPlot} className="space-y-4">
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                            {/* Code de la parcelle */}
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                            {/* Code du batiment */}
                             <div className="space-y-2">
-                                <Label htmlFor="code">Code de la parcelle *</Label>
+                                <Label htmlFor="code">Code du batiment *</Label>
                                 <Input
                                     id="code"
                                     name="code"
                                     value={formData.code}
                                     onChange={handleInputChange}
-                                    placeholder="Code de la parcelle"
+                                    placeholder="Code du batiment"
                                     required
                                 />
                             </div>
 
-                            {/* Statut de la parcelle */}
+                            {/* State du batiment */}
                             <div className="space-y-2">
-                                <Label htmlFor="status">Statut *</Label>
+                                <Label htmlFor="state">State *</Label>
                                 <Select
-                                    value={formData.status}
-                                    onValueChange={(value: "BATI" | "NON BATI") => handleSelectChange('status', value)}
+                                    value={formData.state}
+                                    onValueChange={(value: string) => handleSelectChange('state', value)}
                                 >
                                     <SelectTrigger className="w-full">
-                                        <SelectValue placeholder="Sélectionnez un statut" />
+                                        <SelectValue placeholder="Sélectionnez un state" />
                                     </SelectTrigger>
                                     <SelectContent className="z-[1500]">
-                                        <SelectItem key={1} value="BATI" defaultChecked>Bâti</SelectItem>
-                                        <SelectItem key={2} value="NON BATI">Non bâti</SelectItem>
+                                        {[...Array(10)].map((_, i) => (
+                                            <SelectItem key={i+1} value={(i+1).toString()}>{i+1}</SelectItem>
+                                        ))}
                                     </SelectContent>
                                 </Select>
+                            </div>
+
+                            {/* Nombre de niveaux */}
+                            <div className="space-y-2">
+                                <Label htmlFor="nbLevels">Nombre de niveaux</Label>
+                                <Input
+                                    id="nbLevels"
+                                    name="nbLevels"
+                                    type="number"
+                                    value={formData.nbLevels}
+                                    onChange={handleInputChange}
+                                    placeholder="Nombre de niveaux"
+                                    min="0"
+                                />
                             </div>
                         </div>
 
                         {/* Cité */}
-                        <div className="space-y-2">
+                        {/* <div className="space-y-2">
                             <Label>Cité</Label>
                             <div className="flex items-end gap-2">
                                 <div className="flex-1">
@@ -461,14 +493,14 @@ const PlotEditionPage = ({ onCancel, onSuccess }: PlotEditionPageProps) => {
                                     <span className="text-lg font-bold cursor-pointer"><PlusCircle /></span>
                                 </button>
                             </div>
-                        </div>
+                        </div> */}
 
                         {/* Hide the following block if a cité (he) is specified */}
                         { !formData.housingEstate && (
                           <>
                             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                 {/* Région */}
-                                <div className="space-y-2">
+                                {/* <div className="space-y-2">
                                     <Label>Région</Label>
                                     <Select
                                         value={formData.region}
@@ -487,10 +519,10 @@ const PlotEditionPage = ({ onCancel, onSuccess }: PlotEditionPageProps) => {
                                             })}
                                         </SelectContent>
                                     </Select>
-                                </div>
+                                </div> */}
 
                                 {/* Département */}
-                                <div className="space-y-2">
+                                {/* <div className="space-y-2">
                                     <Label>Département</Label>
                                     <Select
                                         value={formData.department}
@@ -508,12 +540,12 @@ const PlotEditionPage = ({ onCancel, onSuccess }: PlotEditionPageProps) => {
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                </div>
+                                </div> */}
                             </div>
 
                             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                 {/* Arrondissement */}
-                                <div className="space-y-2">
+                                {/* <div className="space-y-2">
                                     <Label>Arrondissement</Label>
                                     <Select
                                         value={formData.arrondissement}
@@ -531,10 +563,10 @@ const PlotEditionPage = ({ onCancel, onSuccess }: PlotEditionPageProps) => {
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                </div>
+                                </div> */}
 
                                 {/* Commune */}
-                                <div className="space-y-2">
+                                {/* <div className="space-y-2">
                                     <Label>Ville</Label>
                                     <Select
                                         value={formData.town}
@@ -552,11 +584,11 @@ const PlotEditionPage = ({ onCancel, onSuccess }: PlotEditionPageProps) => {
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                </div>
+                                </div> */}
                             </div>
                           
                             {/* Lieu-dit */}
-                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                            {/* <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                 <div className="space-y-2">
                                     <Label htmlFor="place">Lieu-dit</Label>
                                     <Input
@@ -567,114 +599,9 @@ const PlotEditionPage = ({ onCancel, onSuccess }: PlotEditionPageProps) => {
                                         placeholder="Lieu-dit"
                                     />
                                 </div>
-                            </div>
+                            </div> */}
                           </>
                         )}
-
-
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                            {/* Numéro TF */}
-                            <div className="space-y-2">
-                                <Label htmlFor="TFnumber">Numéro TF</Label>
-                                <Input
-                                    id="TFnumber"
-                                    name="TFnumber"
-                                    value={formData.TFnumber}
-                                    onChange={handleInputChange}
-                                    placeholder="Numéro de titre foncier"
-                                />
-                            </div>
-
-                            {/* Année d'acquisition */}
-                            <div className="space-y-2">
-                                <Label htmlFor="acquiredYear">Année d'acquisition</Label>
-                                <Input
-                                    id="acquiredYear"
-                                    name="acquiredYear"
-                                    type="number"
-                                    value={formData.acquiredYear}
-                                    onChange={handleInputChange}
-                                    placeholder="Année d'acquisition"
-                                    min="1900"
-                                    max={new Date().getFullYear()}
-                                />
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                            {/* Classification */}
-                            <div className="space-y-2">
-                                <Label htmlFor="classification">Classification</Label>
-                                <Input
-                                    id="classification"
-                                    type="number"
-                                    name="classification"
-                                    value={formData.classification}
-                                    onChange={handleInputChange}
-                                    placeholder="Classification"
-                                />
-                            </div>
-
-                            {/* Superficie */}
-                            <div className="space-y-2">
-                                <Label htmlFor="area">Superficie (m²)</Label>
-                                <Input
-                                    id="area"
-                                    name="area"
-                                    type="number"
-                                    value={formData.area}
-                                    onChange={handleInputChange}
-                                    placeholder="Superficie en m²"
-                                    min="0"
-                                    step="0.01"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                            {/* Prix d'acquisition */}
-                            <div className="space-y-2">
-                                <Label htmlFor="price">Prix d'acquisition (FCFA)</Label>
-                                <Input
-                                    id="price"
-                                    name="price"
-                                    type="number"
-                                    value={formData.price}
-                                    onChange={handleInputChange}
-                                    placeholder="Prix d'acquisition"
-                                    min="0"
-                                    step="0.01"
-                                />
-                            </div>
-
-                            {/* Valeur marchande */}
-                            <div className="space-y-2">
-                                <Label htmlFor="marketValue">Valeur marchande (FCFA)</Label>
-                                <Input
-                                    id="marketValue"
-                                    name="marketValue"
-                                    type="number"
-                                    value={formData.marketValue}
-                                    onChange={handleInputChange}
-                                    placeholder="Valeur marchande"
-                                    min="0"
-                                    step="0.01"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Observations */}
-                        <div className="space-y-2">
-                            <Label htmlFor="observations">Observations</Label>
-                            <Textarea
-                                id="observations"
-                                name="observations"
-                                value={formData.observations}
-                                onChange={handleInputChange}
-                                placeholder="Observations sur la parcelle"
-                                rows={3}
-                            />
-                        </div>
 
                         <div className="flex gap-2 pt-4">
                             <Button type="submit" className="cursor-pointer" disabled={isLoading}>

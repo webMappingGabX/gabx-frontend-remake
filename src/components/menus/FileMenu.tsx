@@ -1,7 +1,7 @@
 import { motion, AnimatePresence, number } from "framer-motion";
 import { Card, CardContent } from "../ui/card";
 import { Button } from "../ui/button";
-import { Download, File, X, Save, Building, Map, Satellite, Layers } from "lucide-react";
+import { Download, File, X, Save, Building, Map, Satellite, Layers, Landmark } from "lucide-react";
 import { closeMenu } from "../../app/store/slices/settingSlice";
 import { useDispatch, useSelector } from "react-redux";
 import { useToast } from "../../hooks/useToast";
@@ -9,11 +9,12 @@ import { useEffect, useState } from "react";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "../ui/select";
-import { createHousingEstate, fetchHousingEstates, hasMassPlan, hasOrthoPhoto, selectHEHasMassPlan, selectHEHasOrthoPhoto, selectHousingEstates } from "../../app/store/slices/housingEstateSlice";
+import { clearCaracteritics, createHousingEstate, fetchHousingEstates, hasMassPlan, hasOrthoPhoto, hasPlot, selectHEHasMassPlan, selectHEHasOrthoPhoto, selectHEHasPlot, selectHousingEstates } from "../../app/store/slices/housingEstateSlice";
 import { createPlot, fetchPlots, selectPlots, selectPlotsFilters } from "../../app/store/slices/plotSlice";
 import { getArronds, getDepts, getRegions, getTowns, selectArrondState, selectDeptState, selectRegionsState, selectTokens, selectTownsState } from "../../app/store/slices/authSlice";
 import { Separator } from "@radix-ui/react-dropdown-menu";
 import { createBuilding, createPlan } from "../../app/store/slices/planSlice";
+import { multiPolygonToPolygon } from "../../utils/tools";
 
 interface GeoJsonInformations {
     name: string;
@@ -73,11 +74,14 @@ const FileMenu = () => {
     const dispatch = useDispatch();
     const { toast } = useToast();
     const [importedFile, setImportedFile] = useState<GeoJsonInformations | null>(null);
+    const [tfImported, setTfImported] = useState<GeoJsonInformations | null>(null);
     const [geojsonData, setGeojsonData] = useState<Record<string, unknown> | null>(null);
+    const [tfData, setTFData] = useState<Record<string, unknown> | null>(null);
     const [showHousingEstateForm, setShowHousingEstateForm] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [selectedHousingEstate, setSelectedHousingEstate] = useState<string>("");
     const [importType, setImportType] = useState<'PLAN_DE_MASSE' | 'ORTHO_PHOTO' | 'PERSO' | null>(null);
+    const [hasTitreFoncier, setHasTitreFoncier] = useState<boolean>(false);
     
     const [housingEstateForm, setHousingEstateForm] = useState<HousingEstateFormData>({
         name: "",
@@ -118,9 +122,11 @@ const FileMenu = () => {
 
     const [hasExistingMassePlan, setHasExistingMassePlan] = useState(false);
     const [hasExistingOrthophoto, setHasExistingOrthophoto] = useState(false);
+    const [hasExistingPlot, setHasExistingPlot] = useState(false);
 
     const selectHasMassPlan = useSelector(selectHEHasMassPlan);
     const selectHasOrthoPhoto = useSelector(selectHEHasOrthoPhoto);
+    const selectHasPlot = useSelector(selectHEHasPlot);
 
     const loadHousingEstates = async () => {
         try {
@@ -168,14 +174,17 @@ const FileMenu = () => {
 
     const checkHasMassPlan = async (id : number) => {
         const response = await dispatch(hasMassPlan(id));
-
         console.log("HAS MAS PLANE RESPONSE", response);
     }
 
     const checkHasOrthoPhoto = async (id : number) => {
         const response = await dispatch(hasOrthoPhoto(id));
-
         console.log("HAS ORTHO PHOTO RESPONSE", response);
+    }
+
+    const checkHasPlot = async (id : number) => {
+        const response = await dispatch(hasPlot(id));
+        console.log("HAS PLOT RESPONSE", response);
     }
 
     // Mettre à jour l'état des plans existants quand la cité sélectionnée change
@@ -185,9 +194,10 @@ const FileMenu = () => {
 
             checkHasMassPlan(id);
             checkHasOrthoPhoto(id);
+            checkHasPlot(id);
+        } else {
+            dispatch(clearCaracteritics());
         }
-
-
     }, [selectedHousingEstate]);
 
     useEffect(() => {
@@ -197,6 +207,10 @@ const FileMenu = () => {
     useEffect(() => {
         setHasExistingOrthophoto(selectHasOrthoPhoto);
     }, [selectHasOrthoPhoto]);
+
+    useEffect(() => {
+        setHasExistingPlot(selectHasPlot);
+    }, [selectHasPlot]);
 
     // Helper function to format file size
     const formatFileSize = (bytes: number): string => {
@@ -254,39 +268,12 @@ const FileMenu = () => {
         return `PROP_${timestamp}_${randomStr}`.toUpperCase();
     };
 
-    // Fonction de conversion en GeometryCollection
-    const convertToGeometryCollection = (geometry: Record<string, unknown>): Record<string, unknown> => {
-        if (!geometry) {
-            throw new Error("Aucune géométrie fournie");
-        }
-        if (geometry.type === 'GeometryCollection') {
-            return geometry;
-        }
-        return {
-            type: 'GeometryCollection',
-            geometries: [geometry]
-        };
-    };
-
-    // Convert MultiPolygon geometry to Polygon geometry by extracting its first polygon
-    const multiPolygonToPolygon = (geometry: Record<string, any>): Record<string, any> => {
-        if (!geometry) return geometry;
-        if (geometry.type === "MultiPolygon" && Array.isArray(geometry.coordinates) && geometry.coordinates.length > 0) {
-            // Use the first polygon in the MultiPolygon
-            return {
-                type: "Polygon",
-                coordinates: geometry.coordinates[0]
-            };
-        }
-        return geometry;
-    };
-
     // Fonction pour extraire les polygones des features
     const extractPolygonsFromGeoJSON = (geojson: Record<string, unknown>): any[] => {
         const polygons: any[] = [];
-        
-        if (geojson.type === 'FeatureCollection' && Array.isArray(geojson.features)) {
-            geojson.features.forEach((feature: Record<string, unknown>) => {
+        console.log("EXTRACT", geojson);
+        if (geojson?.type === 'FeatureCollection' && Array.isArray(geojson?.features)) {
+            geojson?.features.forEach((feature: Record<string, unknown>) => {
                 const geometry = feature.geometry as Record<string, unknown>;
                 
                 if (geometry && (geometry.type === 'Polygon' || geometry.type === 'MultiPolygon')) {
@@ -335,27 +322,48 @@ const FileMenu = () => {
         }
     };
 
+    const createPlotMethod = async (formData: PlotFormData): Promise<string | null> => {
+        try {
+            const response = await dispatch(createPlot(formData));
+            
+            if(response.type.includes("rejected"))
+            {
+                throw new Error('Erreur lors de l\'envoi des données');
+            }
+        } catch (error) {
+            console.error('Erreur:', error);
+            toast({
+                title: "Erreur",
+                description: "Impossible de créer la parcelle",
+                variant: "destructive"
+            });
+        }
+    };
+
     // Fonction pour envoyer le plot à l'API
     const sendPlotToAPI = async (plotData: PlotData) => {
         try {
-
             const { buildings, geom, ...planData } = plotData;
 
             console.log("PLAN DATA SENT", planData);
-            //const response = await dispatch(createPlan(plotData));
+            // Pour les autres types, utiliser createPlan
             const response = await dispatch(createPlan(planData));
-            
             console.log("CREATING PLAN RESPONSE", response);
+            
             if(response.type.includes("fulfilled")) {
-                const plotId = response.payload.data.plots[0].id;
+                //const plotId = response.payload.data.plots[0].id;
+                const planId = response.payload.data.plan.id;
 
                 let total = 0;
                 for (const building of buildings ?? []) {
                     const buildingData = {
-                        plotId,
-                        geom: multiPolygonToPolygon(building)   
+                        //plotId,
+                        planId,
+                        geom: multiPolygonToPolygon(building),
+
                     }
 
+                    //const response2 = await dispatch(createBuilding(buildingData));
                     const response2 = await dispatch(createBuilding(buildingData));
                     total++;
 
@@ -363,8 +371,7 @@ const FileMenu = () => {
                 }
             }
 
-            if(response.type.includes("rejected"))
-            {
+            if(response.type.includes("rejected")) {
                 throw new Error('Erreur lors de l\'envoi des données');
             }
 
@@ -384,8 +391,6 @@ const FileMenu = () => {
             let housingEstateId: string | null = selectedHousingEstate;
 
             // Si le formulaire housing estate est rempli, on le crée d'abord
-            /*if (showHousingEstateForm && 
-                (housingEstateForm.region || housingEstateForm.town || housingEstateForm.department)) {*/
             console.log("HE ID", housingEstateId, "     SELECTED HE", selectedHousingEstate);
             console.log("SHOW HE", showHousingEstateForm);
             console.log("IS NUMBER", !Number.isInteger(Number(selectedHousingEstate)));
@@ -409,27 +414,39 @@ const FileMenu = () => {
                 return;
             }
 
+            // Importation des titres fonctiers (parcelles)
+            if(tfData != null) {
+                const tempPolygons = extractPolygonsFromGeoJSON(tfData)
+                console.log("TEMP POLYGONS FOR TF", tempPolygons, "TF DATA  ", tfData);
+                for(let tmpPol of tempPolygons) {
+                    const dt = {
+                        housingEstateId: parseInt(housingEstateId),
+                        geom: multiPolygonToPolygon(tmpPol),
+                        TFnumber: tmpPol.properties?.TFnumber ?? undefined,
+                        acquiredYear: tmpPol.properties?.acquiredYear ?? undefined,
+                        classification: tmpPol.properties?.classification ?? undefined,
+                        area: tmpPol.properties?.area ?? undefined,
+                        price: tmpPol.properties?.price ?? undefined,
+                        marketValue: tmpPol.properties?.marketValue ?? undefined,
+                        observations: tmpPol.properties?.observations ?? undefined,
+                        status: tmpPol.properties?.status ?? undefined,
+                        code: tmpPol.properties?.code ?? generateUniqueCode()
+                    }
+    
+                    await createPlotMethod(dt);
+                }
+            }
+
             // Extraire les polygones pour les bâtiments
             const buildings = extractPolygonsFromGeoJSON(geojsonData);
-            
+
             // Préparer les données du plot selon le format attendu par l'API
             const plotData: PlotData = {
                 housingEstateId: parseInt(housingEstateId),
                 type: importType,
-                area: plotForm.area,
-                TFnumber: plotForm.TFnumber || undefined,
-                acquiredYear: plotForm.acquiredYear,
-                classification: plotForm.classification,
-                plotArea: plotForm.plotArea,
-                price: plotForm.price,
-                marketValue: plotForm.marketValue,
-                observations: plotForm.observations || undefined,
-                status: plotForm.status,
-                buildings: buildings,
-                max: plotForm.max,
-                //geom: convertToGeometryCollection(geojsonData),
                 geom: geojsonData,
-                code: generateUniqueCode()
+                code: generateUniqueCode(),
+                buildings: buildings
             };
 
             // Envoi du plot à l'API
@@ -442,7 +459,8 @@ const FileMenu = () => {
             });
 
             // Réinitialiser l'état
-            setImportedFile(null);
+            /*setImportedFile(null);
+            setTfImported(null);
             setGeojsonData(null);
             setShowHousingEstateForm(false);
             setImportType(null);
@@ -469,7 +487,7 @@ const FileMenu = () => {
                 status: undefined,
                 buildings: [],
                 max: 200
-            });
+            });*/
 
         } catch (error) {
             console.log("ERROR", error);
@@ -483,8 +501,9 @@ const FileMenu = () => {
         }
     };
 
-    const handleImportGeoJson = (type: 'PLAN_DE_MASSE' | 'ORTHO_PHOTO' | 'PERSO') => {
-        setImportType(type);
+    const handleImportGeoJson = (type: 'PLAN_DE_MASSE' | 'ORTHO_PHOTO' | 'PERSO' | null = null, isTF : boolean = false) => {
+        if(type !== null)
+            setImportType(type);
         
         const input = document.createElement('input');
         input.type = 'file';
@@ -526,21 +545,38 @@ const FileMenu = () => {
                         const propertiesText = Array.from(analysis.properties).slice(0, 5).join(', ') + 
                             (analysis.properties.size > 5 ? ` (+${analysis.properties.size - 5} autres)` : '');
 
-                        setImportedFile({
-                            name: file.name,
-                            size: file.size,
-                            type: analysis.type,
-                            featureCount: analysis.featureCount,
-                            geometryTypesText,
-                            propertiesText,
-                            crs: (geojson.crs as { properties?: { name?: string } })?.properties?.name || "Inconnu"
-                        });
+                        if(!isTF)
+                        {
+                            setImportedFile({
+                                name: file.name,
+                                size: file.size,
+                                type: analysis.type,
+                                featureCount: analysis.featureCount,
+                                geometryTypesText,
+                                propertiesText,
+                                crs: (geojson.crs as { properties?: { name?: string } })?.properties?.name || "Inconnu"
+                            });
 
-                        setGeojsonData(geojson);
+                            setGeojsonData(geojson);
+                        } else {
+                            setTfImported({
+                                name: file.name,
+                                size: file.size,
+                                type: analysis.type,
+                                featureCount: analysis.featureCount,
+                                geometryTypesText,
+                                propertiesText,
+                                crs: (geojson.crs as { properties?: { name?: string } })?.properties?.name || "Inconnu"
+                            });
+
+                            setTFData(geojson);
+                        }
+
+                        //setGeojsonData(geojson);
                         
                         toast({
                             title: "GeoJSON importé avec succès !",
-                            description: `Prêt à sauvegarder ${analysis.featureCount} feature(s) comme ${getImportTypeLabel(type)}`
+                            description: `Prêt à sauvegarder ${analysis.featureCount} feature(s) comme ${getImportTypeLabel(type || "PLAN_DE_MASSE")}`
                         });
 
                     } catch (error) {
@@ -577,6 +613,7 @@ const FileMenu = () => {
             case 'PLAN_DE_MASSE': return 'Plan de masse';
             case 'ORTHO_PHOTO': return 'Orthophoto';
             case 'PERSO': return 'Couche personnalisée';
+            // case 'TITRE_FONCIER': return 'Titre foncier';
             default: return '';
         }
     };
@@ -632,6 +669,24 @@ const FileMenu = () => {
                                                 </SelectContent>
                                             </Select>
                                             
+                                            <div className="grid grid-cols-1 gap-3 mb-2">
+                                                <Button
+                                                    variant={hasExistingPlot ? "destructive" : "default"}
+                                                    className={ `cursor-pointer  ${(!selectedHousingEstate && !showHousingEstateForm) == true ? `hidden` : `flex flex-row` }`}
+                                                    onClick={() => handleImportGeoJson(null, true)}
+                                                    disabled={!selectedHousingEstate && !showHousingEstateForm}
+                                                >
+                                                    <Landmark className="w-4 h-4 mr-2" />
+                                                    {hasExistingPlot ? 'Ajouter les titres fonciers' : 'Importer les titres fonciers'}
+                                                    {hasExistingPlot && <span className="ml-2">⚠️</span>}
+                                                </Button>
+                                            </div>
+                                            {tfImported && (
+                                                <div className="mt-2 mb-4">
+                                                    <h2 className="text-md">{tfImported.featureCount} titres fonciers pret a etre importes</h2>
+                                                </div>
+                                            )}
+
                                             {selectedHousingEstate === "new" && (
                                                 <div className="p-4 mt-2 border rounded-md">
                                                     <h3 className="mb-3 font-semibold">Nouvelle cité</h3>
@@ -778,7 +833,7 @@ const FileMenu = () => {
                                 </div>
 
                                 {importedFile && (
-                                    <div className="mb-4 mt-2">
+                                    <div className="mt-2 mb-4">
                                         <h2 className="mb-2 font-semibold text-md">Informations du fichier importé</h2>
                                         <ul className="text-sm text-gray-700 dark:text-gray-300">
                                             <li><span className="font-medium">Nom:</span> {importedFile.name}</li>
@@ -788,89 +843,6 @@ const FileMenu = () => {
                                             <li><span className="font-medium">CRS:</span> {importedFile.crs || "Inconnu"}</li>
                                             <li><span className="font-medium">Import comme:</span> {getImportTypeLabel(importType!)}</li>
                                         </ul>
-
-                                        <div className="p-4 mt-4 border rounded-md">
-                                            <h3 className="mb-3 font-semibold">Informations supplémentaires</h3>
-                                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                                <div className="space-y-2">
-                                                    <Label>Numéro TF</Label>
-                                                    <Input
-                                                        value={plotForm.TFnumber || ''}
-                                                        onChange={(e) => handlePlotFormChange('TFnumber', e.target.value)}
-                                                    />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <Label>Année d'acquisition</Label>
-                                                    <Input
-                                                        type="number"
-                                                        value={plotForm.acquiredYear || ''}
-                                                        onChange={(e) => handlePlotFormChange('acquiredYear', parseInt(e.target.value) || undefined)}
-                                                    />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <Label>Classification</Label>
-                                                    <Input
-                                                        type="number"
-                                                        value={plotForm.classification || ''}
-                                                        onChange={(e) => handlePlotFormChange('classification', parseInt(e.target.value) || undefined)}
-                                                    />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <Label>Surface (m²)</Label>
-                                                    <Input
-                                                        type="number"
-                                                        value={plotForm.area || ''}
-                                                        onChange={(e) => handlePlotFormChange('area', parseFloat(e.target.value) || undefined)}
-                                                    />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <Label>Surface parcelle (m²)</Label>
-                                                    <Input
-                                                        type="number"
-                                                        value={plotForm.plotArea || ''}
-                                                        onChange={(e) => handlePlotFormChange('plotArea', parseFloat(e.target.value) || undefined)}
-                                                    />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <Label>Prix (FCFA)</Label>
-                                                    <Input
-                                                        type="number"
-                                                        value={plotForm.price || ''}
-                                                        onChange={(e) => handlePlotFormChange('price', parseFloat(e.target.value) || undefined)}
-                                                    />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <Label>Valeur marchande (FCFA)</Label>
-                                                    <Input
-                                                        type="number"
-                                                        value={plotForm.marketValue || ''}
-                                                        onChange={(e) => handlePlotFormChange('marketValue', parseFloat(e.target.value) || undefined)}
-                                                    />
-                                                </div>
-                                                <div className="space-y-2 md:col-span-2">
-                                                    <Label>Observations</Label>
-                                                    <Input
-                                                        value={plotForm.observations || ''}
-                                                        onChange={(e) => handlePlotFormChange('observations', e.target.value)}
-                                                    />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <Label>Statut</Label>
-                                                    <Select
-                                                        value={plotForm.status || ''}
-                                                        onValueChange={(value: "BATI" | "NON BATI") => handlePlotFormChange('status', value)}
-                                                    >
-                                                        <SelectTrigger className="w-full">
-                                                            <SelectValue placeholder="Sélectionnez un statut" />
-                                                        </SelectTrigger>
-                                                        <SelectContent className="z-[1500] w-full">
-                                                            <SelectItem value="BATI">Bâti</SelectItem>
-                                                            <SelectItem value="NON BATI">Non bâti</SelectItem>
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
-                                            </div>
-                                        </div>
 
                                         <Button
                                             className="w-full mt-4 cursor-pointer"
@@ -889,6 +861,6 @@ const FileMenu = () => {
             </motion.div>
         </AnimatePresence>
     );
-}
+};
 
 export default FileMenu;

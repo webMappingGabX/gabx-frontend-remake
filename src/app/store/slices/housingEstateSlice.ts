@@ -56,6 +56,7 @@ export interface HousingEstateState {
     error: string | null;
     hasPlan : boolean;
     hasOrtho : boolean;
+    hasPlot: boolean;
     pagination: {
         page: number;
         limit: number;
@@ -83,6 +84,7 @@ const initialState: HousingEstateState = {
     error: null,
     hasPlan : false,
     hasOrtho : false,
+    hasPlot: false,
     pagination: {
         page: 1,
         limit: 10,
@@ -224,6 +226,20 @@ export const hasOrthoPhoto = createAsyncThunk(
     }
 );
 
+export const hasPlot = createAsyncThunk(
+    'housingEstates/hasPlot',
+    async (id : number, { rejectWithValue }) => {
+        try{
+            const response = await axios.get(`/housing-estates/${id}/has-plot`);
+            return response.data;
+        } catch (error : unknown) {
+            console.log("HAS PLOT ERROR     ", error);
+            const axiosError = error as AxiosErrorResponse;
+            return rejectWithValue(axiosError.response?.data?.message || 'Erreur de connexion au serveur');
+        }
+    }
+);
+
 const housingEstateSlice = createSlice({
     name: "housingEstates",
     initialState,
@@ -244,11 +260,19 @@ const housingEstateSlice = createSlice({
         clearError: (state) => {
             state.error = null;
         },
+        clearCurrentHousingEstate: (state) => {
+            state.currentHousingEstate = null;
+        },
         setPagination: (state, action: PayloadAction<Partial<HousingEstateState['pagination']>>) => {
             state.pagination = { ...state.pagination, ...action.payload };
         },
         clearStats: (state) => {
             state.currentStats = null;
+        },
+        clearCaracteritics: (state) => {
+            state.hasPlan = false;
+            state.hasOrtho = false;
+            state.hasPlot = false;
         },
         propagateAttributesToPlots: (state, action: PayloadAction<number>) => {
             const housingEstateId = action.payload;
@@ -433,6 +457,21 @@ const housingEstateSlice = createSlice({
                 state.loading = false;
                 state.error = action.error.message || 'Failed to fetch has ortho photo';
             });
+        
+        // hasPlot
+        builder
+            .addCase(hasPlot.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(hasPlot.fulfilled, (state, action) => {
+                state.loading = false;
+                state.hasPlot = action.payload.hasPlot;
+            })
+            .addCase(hasPlot.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.error.message || 'Failed to fetch has ortho photo';
+            });
     }
 });
 
@@ -443,7 +482,9 @@ export const {
     clearError,
     setPagination,
     clearStats,
-    propagateAttributesToPlots
+    propagateAttributesToPlots,
+    clearCaracteritics,
+    clearCurrentHousingEstate
 } = housingEstateSlice.actions;
 
 export default housingEstateSlice.reducer;
@@ -459,4 +500,5 @@ export const selectHousingEstatesFilters = (state: { housingEstates: HousingEsta
 
 export const selectHEHasMassPlan = (state: { housingEstates: HousingEstateState }) => state.housingEstates.hasPlan;
 export const selectHEHasOrthoPhoto = (state: { housingEstates: HousingEstateState }) => state.housingEstates.hasOrtho;
+export const selectHEHasPlot = (state: { housingEstates: HousingEstateState }) => state.housingEstates.hasPlot;
 

@@ -175,7 +175,7 @@ const ViewMenu = () => {
                                     
                                     <div className="space-y-2">
                                         <div className="flex items-center justify-between">
-                                            <Label className="text-sm">Empiètements</Label>
+                                            <Label className="text-sm">Intersections</Label>
                                             <Switch
                                                 checked={selectOverlapsFromState}
                                                 onCheckedChange={handleViewOverlapChange}
@@ -190,7 +190,7 @@ const ViewMenu = () => {
                                         </div>
                                     </div>
 
-                                    <div className="space-y-2 mt-1">
+                                    <div className="mt-1 space-y-2">
                                         <h4>Geographie</h4>
                                         <div className="flex items-center justify-between">
                                             <Label className="text-sm">Plan de masse</Label>
