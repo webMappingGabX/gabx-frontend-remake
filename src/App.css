@@ -141,6 +141,18 @@
   }
 }
 
+.leaflet-tile {
+  image-rendering: pixelated;
+}
+
+.leaflet-container img.leaflet-tile {
+  background: none !important;
+}
+
+.leaflet-tile-container {
+  background-color: white;
+}
+
 /* .force-classic-colors,
 .force-classic-colors * {
   color: #000000 !important;

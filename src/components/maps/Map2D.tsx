@@ -21,7 +21,7 @@ import { useToast } from "../../hooks/useToast";
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useDispatch, useSelector } from "react-redux";
-import { AvailableMenus, selectLayers, selectMenu, selectSearch } from "../../app/store/slices/settingSlice";
+import { AvailableMenus, selectExcludedTypes, selectLayers, selectMenu, selectOverlaps, selectSearch } from "../../app/store/slices/settingSlice";
 import FileMenu from "../menus/FileMenu";
 import { deletePlot, fetchPlots, selectPlots, setCurrentPlot, type Plot } from "../../app/store/slices/plotSlice";
 import { isFulfilled } from "@reduxjs/toolkit";
@@ -35,6 +35,7 @@ import 'leaflet-easyprint';
 import * as turf from "@turf/turf";
 import ViewMenu from "../menus/ViewMenu";
 import ExportMenu from "../menus/ExportMenu";
+import { fetchBuildings, selectBuildings } from "../../app/store/slices/buildingSlice";
 
 // Icônes personnalisées pour Leaflet (important pour le bon affichage)
 delete (L.Icon.Default.prototype as { _getIconUrl?: string })._getIconUrl;
@@ -44,14 +45,24 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-// Types pour les données géospatiales
 interface Parcelle {
   id: string;
   nom: string;
   superficie: number;
   coordinates: [number, number][];
-  type: string;
+  type: string; // "polygon" ou "multipolygon"
   proprietaire: string;
+  code?: string;
+  area?: number;
+  TFnumber?: string;
+  price?: number;
+  place?: string;
+  acquiredYear?: number;
+  housingEstate?: any;
+  region?: any;
+  department?: any;
+  arrondissement?: any;
+  geom?: any;
 }
 
 interface Intersection {
@@ -69,8 +80,9 @@ interface MapViewport {
 
 const Map2D = () => {
   const [viewport, setViewport] = useState<MapViewport>({
-    center: [3.868177, 11.519596],
-    zoom: 16
+    //center: [3.868177, 11.519596],
+    center: [3.871938439234408, 11.486828448681182],
+    zoom: 17
   });
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedParcelle, setSelectedParcelle] = useState<Parcelle | null>(null);
@@ -98,8 +110,11 @@ const Map2D = () => {
   const isSearchActive = useSelector(selectSearch);
   const isLayersActive = useSelector(selectLayers);
   const currentOpenedMenu = useSelector(selectMenu);
-  const selectedPlots = useSelector(selectPlots);
-
+  //const selectedPlots = useSelector(selectPlots);
+  const selectedBuildings = useSelector(selectBuildings);
+  const selectExcludeTypesFS = useSelector(selectExcludedTypes);
+  const selectOverlapsFS = useSelector(selectOverlaps);
+  
   const navigate = useNavigate();
   const [parcelles, setParcelles] = useState<Parcelle[]>([]);
 
@@ -149,7 +164,7 @@ const Map2D = () => {
 
   // Fonction pour calculer les intersections
   const calculateIntersections = () => {
-    if (!parcelleLayers) return;
+    if (!parcelleLayers || !selectOverlapsFS) return;
 
     const layers = parcelleLayers.getLayers();
     const polygons = layers.filter(layer => layer instanceof L.Polygon) as L.Polygon[];
@@ -196,7 +211,7 @@ const Map2D = () => {
 
   // Fonction pour afficher les intersections sur la carte
   const displayIntersections = () => {
-    if (!intersectionLayers || !mapInstance.current) return;
+    if (!intersectionLayers || !mapInstance.current || !selectOverlapsFS) return;
 
     // Nettoyer les layers existants
     intersectionLayers.clearLayers();
@@ -236,19 +251,39 @@ const Map2D = () => {
     });
   };
 
+  // Remplacer l'effet d'initialisation actuel par celui-ci :
   useEffect(() => {
     if (mapInstance.current && !printControlRef.current) {
-      // @ts-ignore
-      printControlRef.current = L.easyPrint({
-        title: 'Exporter la carte',
-        position: 'topleft',
-        sizeModes: ['Current', 'A4Landscape', 'A4Portrait'],
-        exportOnly: true,
-        hideControlContainer: true,
-        autoPrint: false
-      }).addTo(mapInstance.current);
+      try {
+        // @ts-ignore
+        const printControl = L.easyPrint({
+          title: 'Exporter la carte',
+          position: 'topleft',
+          sizeModes: ['Current', 'A4Landscape', 'A4Portrait'],
+          exportOnly: true,
+          hideControlContainer: true,
+          autoPrint: false
+        });
+        
+        printControl.addTo(mapInstance.current);
+        printControlRef.current = printControl;
+        
+        console.log("EasyPrint control initialized successfully");
+      } catch (error) {
+        console.error("Error initializing EasyPrint:", error);
+        printControlRef.current = null;
+      }
     }
   }, [mapInstance.current]);
+
+  // Ajouter un cleanup
+  useEffect(() => {
+    return () => {
+      if (printControlRef.current && mapInstance.current) {
+        mapInstance.current.removeControl(printControlRef.current);
+      }
+    };
+  }, []);
 
   // Écouter l'événement personnalisé pour sélectionner une intersection
   useEffect(() => {
@@ -273,7 +308,8 @@ const Map2D = () => {
     if (mapRef.current && !mapInstance.current) {
       // Création de l'instance de carte Leaflet
       mapInstance.current = L.map(mapRef.current, {
-        zoomControl: false
+        zoomControl: false,
+        //preferCanvas: true
       }).setView(
         [viewport.center[0], viewport.center[1]], 
         viewport.zoom
@@ -281,8 +317,14 @@ const Map2D = () => {
       
       // Ajout de la couche tuiles OpenStreetMap
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        crossOrigin: true,
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       }).addTo(mapInstance.current);
+      /*L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png', {
+        crossOrigin: true,
+        maxZoom: 20,
+        attribution: '&copy; OpenStreetMap, &copy; Stadia Maps'
+      }).addTo(mapInstance.current);*/
       
       // Création d'un groupe de layers pour les parcelles
       const layerGroup = L.layerGroup().addTo(mapInstance.current);
@@ -308,7 +350,7 @@ const Map2D = () => {
     // Initialiser easyPrint
     if (mapInstance.current) {
       // @ts-ignore
-      const printC = L.easyPrint({
+      /*const printC = L.easyPrint({
         title: 'Exporter la carte',
         position: 'topleft',
         sizeModes: ['Current', 'A4Landscape', 'A4Portrait'],
@@ -316,7 +358,7 @@ const Map2D = () => {
         hideControlContainer: true
       }).addTo(mapInstance.current);
 
-      setPrintControl(printC);
+      setPrintControl(printC);*/
     }
     return () => {
       if (mapInstance.current) {
@@ -328,7 +370,10 @@ const Map2D = () => {
   
   useEffect(() => {
     const fetchAndFilterPlots = async () => {
-      const getPlotsResponses = await dispatch(fetchPlots({ search: searchQuery }));
+      //const getPlotsResponses = await dispatch(fetchPlots({ search: searchQuery }));
+      const getPlotsResponses = await dispatch(
+        fetchBuildings({ search: searchQuery, excludeTypes: Array.isArray(selectExcludeTypesFS) ? selectExcludeTypesFS.join(',') : '' })
+      );
       console.log("GET PLOT RESPONSE", getPlotsResponses);
       if(getPlotsResponses.type.includes("fulfilled")) {
         console.log("FULLFILLED PLOTS");
@@ -336,7 +381,7 @@ const Map2D = () => {
     }
 
     fetchAndFilterPlots();
-  }, [searchQuery]);
+  }, [searchQuery, selectExcludeTypesFS]);
 
   // Mettre à jour les parcelles et calculer les intersections
   useEffect(() => {
@@ -378,83 +423,79 @@ const Map2D = () => {
     });
 
     // Calculer les intersections après un délai pour s'assurer que les polygones sont rendus
+    /*setTimeout(() => {
+      calculateIntersections();
+    }, 100);*/
+
+  }, [parcelles, selectedParcelle, parcelleLayers]);
+  
+  useEffect(() => {
     setTimeout(() => {
       calculateIntersections();
     }, 100);
-
-  }, [parcelles, selectedParcelle, parcelleLayers]);
+  }, [parcelles, parcelleLayers, selectOverlapsFS]);
 
   useEffect(() => {
     const importsPlots : any[] = [];
-    selectedPlots?.forEach((plot) => {
-        // Get geometries in plot
-        plot?.geom?.geometries?.forEach((geom) => {
-          if (geom.type.toLowerCase() === "multipolygon") {
-            geom.coordinates.forEach((polygonCoords: any) => {
-              const latlngs = polygonCoords.map((ring: any) =>
-                ring.map((coord: any) => [coord[1], coord[0]])
-              );
-              const instance = {
-                ...plot,
-                coordinates: latlngs
-              }
-              importsPlots.push(instance);
-            });
-          } else if (geom.type.toLowerCase() === "polygon") {
-            const latlngs = geom.coordinates.map((ring: any) => ring.map((coord: any) => [coord[1], coord[0]]));
-            // const polygon = L.polygon(latlngs, uniStyle);
-
-            const instance = {
-              ...plot,
-              coordinates: latlngs
-            }
-            
-            console.log("----------> INTEGRATE POLYGON");
-            importsPlots.push(instance);
-          } else if (geom.type.toLowerCase() === "multilinestring") {
-              geom.coordinates.forEach((lineCoord: any) => {
-                const latlngs = lineCoord.map((coord: any) => [coord[1], coord[0]]);
-
-                const line = L.polyline(latlngs, multiStyle);
-                
-                //line.addTo(parcelleLayers);
-              });
-          } else if (geom.type.toLowerCase() === "linestring") {
-              const latlngs = geom.coordinates.map((coord: any) => [coord[1], coord[0]]);
-              console.log("LINE LATLONG", latlngs, "GEOM", geom);
-              const line = L.polyline(latlngs, multiStyle);
-              
-              //line.addTo(parcelleLayers);
-              //importsPlots.push(line);
-          } else if (geom.type.toLowerCase() === "multipoint") {
-            geom.coordinates.forEach((coord: any) => {
-              const latlng = [coord[1], coord[0]];
-              const marker = L.marker(latlng, { icon: L.icon({ iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png', iconSize: [25, 41], iconAnchor: [12, 41] }) });
-              
-              // marker.addTo(parcelleLayers);
-            })
-          } else if (geom.type.toLowerCase() === "point") {
-            const coord = geom.coordinates;
-            const latlng = [coord[1], coord[0]];
-            const marker = L.marker(latlng, { icon: L.icon({ iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png', iconSize: [25, 41], iconAnchor: [12, 41] }) });
-            
-            // marker.addTo(parcelleLayers);
-        } else {
-          throw new Error("Unsupported geometry type: " + geom.type);
-        }
+    selectedBuildings?.forEach((plot) => {
+      // Get geometries in plot
+      const geom = plot?.geom;
+      if (geom.type.toLowerCase() === "multipolygon") {
+        geom.coordinates.forEach((polygonCoords: any) => {
+          const latlngs = polygonCoords.map((ring: any) =>
+            ring.map((coord: any) => [coord[1], coord[0]])
+          );
+          const instance = {
+            ...plot,
+            coordinates: latlngs,
+            type: "multipolygon" // Ajouter le type
+          }
+          importsPlots.push(instance);
         });
+      } else if (geom.type.toLowerCase() === "polygon") {
+        const latlngs = geom.coordinates.map((ring: any) => ring.map((coord: any) => [coord[1], coord[0]]));
+        const instance = {
+          ...plot,
+          coordinates: latlngs,
+          type: "polygon" // Ajouter le type
+        }
+        
+        console.log("----------> INTEGRATE POLYGON");
+        importsPlots.push(instance);
+      } else if (geom.type.toLowerCase() === "multilinestring") {
+        geom.coordinates.forEach((lineCoord: any) => {
+          const latlngs = lineCoord.map((coord: any) => [coord[1], coord[0]]);
+          const line = L.polyline(latlngs, multiStyle);
+        });
+      } else if (geom.type.toLowerCase() === "linestring") {
+        const latlngs = geom.coordinates.map((coord: any) => [coord[1], coord[0]]);
+        console.log("LINE LATLONG", latlngs, "GEOM", geom);
+        const line = L.polyline(latlngs, multiStyle);
+      } else if (geom.type.toLowerCase() === "multipoint") {
+        geom.coordinates.forEach((coord: any) => {
+          const latlng = [coord[1], coord[0]];
+          const marker = L.marker(latlng, { icon: L.icon({ iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png', iconSize: [25, 41], iconAnchor: [12, 41] }) });
+        })
+      } else if (geom.type.toLowerCase() === "point") {
+        const coord = geom.coordinates;
+        const latlng = [coord[1], coord[0]];
+        const marker = L.marker(latlng, { icon: L.icon({ iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png', iconSize: [25, 41], iconAnchor: [12, 41] }) });
+      } else {
+        console.warn("Unsupported geometry type: " + geom.type);
+      }
+      /*plot?.geom?.geometries?.forEach((geom) => {
+      });*/
     });
-
+  
     setParcelles([
       ...importsPlots
     ])
-
-  }, [selectedPlots]);
+  }, [selectedBuildings, selectOverlapsFS]);
   
   // Afficher les intersections quand elles changent ou quand la couche est activée/désactivée
   useEffect(() => {
     displayIntersections();
-  }, [intersections, activeLayers.intersections, intersectionLayers]);
+  }, [intersections, activeLayers.intersections, intersectionLayers, selectOverlapsFS]);
 
   // Gestion de la visibilité des couches
   useEffect(() => {
@@ -476,118 +517,78 @@ const Map2D = () => {
   // Fonction pour trouver les parcelles impliquées dans une intersection
   const findParcellesInIntersection = (intersection: Intersection) => {
     console.log("IN FIND SELECTED INTERSECTION", intersection);
-
+  
     // Helper to normalize type for comparison
-    const normalizeType = (type: string) =>
-      type.toLowerCase() === "polygon" || type.toLowerCase() === "multipolygon"
-        ? "multipolygon"
-        : type.toLowerCase();
-
+    const normalizeType = (type: string) => {
+      const lowerType = type.toLowerCase();
+      if (lowerType === "polygon" || lowerType === "multipolygon") {
+        return "multipolygon"; // Normaliser les deux types
+      }
+      return lowerType;
+    };
+  
     // Helper to normalize coordinates for comparison
     const normalizeCoordinates = (type: string, coordinates: any) => {
-      if (type.toLowerCase() === "polygon") {
-        return [coordinates];
+      const lowerType = type.toLowerCase();
+      if (lowerType === "polygon") {
+        return [coordinates]; // Convertir Polygon en MultiPolygon format
       }
       return coordinates;
     };
-
-    // Helper to extract all polygons/multipolygons from a geometry collection
-    const extractPolygonsFromGeometryCollection = (geometryCollection: any) => {
-      if (
-        geometryCollection &&
-        geometryCollection.type &&
-        geometryCollection.type.toLowerCase() === "geometrycollection"
-      ) {
-        return geometryCollection.geometries
-          .filter(
-            (g: any) =>
-              g.type.toLowerCase() === "polygon" ||
-              g.type.toLowerCase() === "multipolygon"
-          )
-          .map((g: any) => ({
-            type: normalizeType(g.type),
-            coordinates: normalizeCoordinates(g.type, g.coordinates),
-          }));
+  
+    // Helper to extract polygons from MultiPolygon or single Polygon
+    const extractPolygons = (geomType: string, geomCoords: any) => {
+      const normalizedType = normalizeType(geomType);
+      const normalizedCoords = normalizeCoordinates(geomType, geomCoords);
+      
+      if (normalizedType === "multipolygon") {
+        return normalizedCoords; // Retourner directement les coordonnées MultiPolygon
       }
-      return [];
+      return []; // Retourner tableau vide pour autres types
     };
-
-    // Helper to check if a geometry matches a target geometry (type + coordinates)
+  
+    // Helper to check if geometries match
     const geometryMatches = (
-      gType: string,
-      gCoords: any,
+      pType: string,
+      pCoords: any,
       targetType: string,
       targetCoords: any
     ) => {
-      return (
-        normalizeType(gType) === normalizeType(targetType) &&
-        JSON.stringify(normalizeCoordinates(gType, gCoords)) ===
-          JSON.stringify(normalizeCoordinates(targetType, targetCoords))
-      );
+      const pPolygons = extractPolygons(pType, pCoords);
+      const targetPolygons = extractPolygons(targetType, targetCoords);
+      
+      // Comparer les tableaux de coordonnées
+      return JSON.stringify(pPolygons) === JSON.stringify(targetPolygons);
     };
-
+  
     // Find parcelle1
     const parcelle1 = parcelles.find((p) => {
-      // If p is a geometry collection, check all polygons/multipolygons inside
-      if (
-        p.geom &&
-        p.geom.type &&
-        p.geom.type.toLowerCase() === "geometrycollection"
-      ) {
-        const polygons = extractPolygonsFromGeometryCollection(p.geom);
-        const iType = normalizeType(intersection.polygon1.geometry.type);
-        
-        const iCoords = normalizeCoordinates(
-          intersection.polygon1.geometry.type,
-          intersection.polygon1.geometry.coordinates
-        );
-
-        //console.log("EXTRACTED POLYGONS", polygons, "iType", iType, "iCoords", iCoords);
-        
-        return polygons.some((poly: any) =>
-          geometryMatches(poly.type, poly.coordinates, iType, iCoords)
-        );
-      } else {
-        // Fallback to old logic for non-geometrycollection
-        const pType = normalizeType(p.type);
-        const iType = normalizeType(intersection.polygon1.geometry.type);
-        const pCoords = normalizeCoordinates(p.type, p.coordinates);
-        const iCoords = normalizeCoordinates(
-          intersection.polygon1.geometry.type,
-          intersection.polygon1.geometry.coordinates
-        );
-        return pType === iType && JSON.stringify(pCoords) === JSON.stringify(iCoords);
-      }
+      const pType = normalizeType(p.type);
+      const iType = normalizeType(intersection.polygon1.geometry.type);
+      
+      const pCoords = normalizeCoordinates(p.type, p.coordinates);
+      const iCoords = normalizeCoordinates(
+        intersection.polygon1.geometry.type,
+        intersection.polygon1.geometry.coordinates
+      );
+      
+      return geometryMatches(pType, pCoords, iType, iCoords);
     });
-
+  
     // Find parcelle2
     const parcelle2 = parcelles.find((p) => {
-      if (
-        p.geom &&
-        p.geom.type &&
-        p.geom.type.toLowerCase() === "geometrycollection"
-      ) {
-        const polygons = extractPolygonsFromGeometryCollection(p.geom);
-        const iType = normalizeType(intersection.polygon2.geometry.type);
-        const iCoords = normalizeCoordinates(
-          intersection.polygon2.geometry.type,
-          intersection.polygon2.geometry.coordinates
-        );
-        return polygons.some((poly: any) =>
-          geometryMatches(poly.type, poly.coordinates, iType, iCoords)
-        );
-      } else {
-        const pType = normalizeType(p.type);
-        const iType = normalizeType(intersection.polygon2.geometry.type);
-        const pCoords = normalizeCoordinates(p.type, p.coordinates);
-        const iCoords = normalizeCoordinates(
-          intersection.polygon2.geometry.type,
-          intersection.polygon2.geometry.coordinates
-        );
-        return pType === iType && JSON.stringify(pCoords) === JSON.stringify(iCoords);
-      }
+      const pType = normalizeType(p.type);
+      const iType = normalizeType(intersection.polygon2.geometry.type);
+      
+      const pCoords = normalizeCoordinates(p.type, p.coordinates);
+      const iCoords = normalizeCoordinates(
+        intersection.polygon2.geometry.type,
+        intersection.polygon2.geometry.coordinates
+      );
+      
+      return geometryMatches(pType, pCoords, iType, iCoords);
     });
-
+  
     return { parcelle1, parcelle2 };
   };
 
@@ -774,7 +775,7 @@ const Map2D = () => {
       }
       
       // Méthode 2: Fallback avec html2canvas
-      await captureWithHtml2Canvas();
+      //await captureWithHtml2Canvas();
       
     } catch (error) {
       console.error('Erreur capture complète:', error);
@@ -1650,22 +1651,24 @@ const Map2D = () => {
             <CardContent className="p-4">
               <div className="flex items-start justify-between">
                 <div>
-                  <h3 className="text-lg font-bold">{selectedParcelle.nom}</h3>
+                  <h3 className="text-lg font-bold">{selectedParcelle.code || "Non spécifié"}</h3>
                   <p className="pb-2 text-sm text-slate-600 dark:text-slate-400">
-                    CODE: {selectedParcelle.code} | {selectedParcelle.area} ha
+                    SURFACE: {selectedParcelle.area} ha
                   </p>
-                  <p className="text-sm">Titre foncié: {selectedParcelle.TFnumber != null ? selectedParcelle.TFnumber : "Non spécifié"}</p>
-                  <p className="text-sm">Prix: {selectedParcelle.price | 0} XAF</p>
-                  <p className="text-sm">Lieu: {selectedParcelle.place != null ? selectedParcelle.place : "Non spécifié"}</p>
-                  <p className="text-sm">Année d'acquisition : {selectedParcelle.acquiredYear != null ? selectedParcelle.acquiredYear : "Non spécifiée"}</p>
-                  <p className="text-sm">Cité : {selectedParcelle.housingEstate != null ? selectedParcelle.housingEstate.name : "Aucune"}</p>
+                  {/* <p className="text-sm">Titre foncié: {selectedParcelle?.plot?.TFnumber != null ? selectedParcelle?.plot?.TFnumber : "Non spécifié"}</p>
+                  <p className="text-sm">Prix: {selectedParcelle?.plot?.price | 0} XAF</p>
+                  <p className="text-sm">Lieu: {selectedParcelle?.plot?.plan?.housingEstate.place != null ? selectedParcelle?.plot?.plan?.housingEstate.place : "Non spécifié"}</p>
+                  <p className="text-sm">Année d'acquisition : {selectedParcelle?.plot?.acquiredYear != null ? selectedParcelle?.plot?.acquiredYear : "Non spécifiée"}</p> */}
+                  <p className="text-sm">Etat : {selectedParcelle?.state != null ? selectedParcelle?.state : "Non spécifié"}</p>
+                  <p className="text-sm">Nombre de niveaux : {selectedParcelle?.nbLevels != null ? selectedParcelle?.nbLevels : "Non spécifié"}</p>
+                  <p className="text-sm">Cité : {selectedParcelle?.plot?.plan?.housingEstate != null ? selectedParcelle?.plot?.plan?.housingEstate.name : "Aucune"}</p>
                   
                   
-                  {selectedParcelle.region != null ? (
+                  {selectedParcelle?.plot?.plan?.housingEstate.region != null ? (
                     <ul className="p-2 list-none rounded bg-green-500/15">
-                      <li className="text-sm">Région : {selectedParcelle.region.name}</li>
-                      <li className="text-sm">Département : {selectedParcelle.department != null ? selectedParcelle.department.name : "Non spécifié"}</li>
-                      <li className="text-sm">Arrondissement : {selectedParcelle.arrondissement != null ? selectedParcelle.arrondissement.name : "Non spécifié"}</li>
+                      <li className="text-sm">Région : {selectedParcelle?.plot?.plan?.housingEstate.region.name}</li>
+                      <li className="text-sm">Département : {selectedParcelle?.plot?.plan?.housingEstate.department != null ? selectedParcelle?.plot?.plan?.housingEstate.department.name : "Non spécifié"}</li>
+                      <li className="text-sm">Arrondissement : {selectedParcelle?.plot?.plan?.housingEstate.arrondissement != null ? selectedParcelle?.plot?.plan?.housingEstate.arrondissement.name : "Non spécifié"}</li>
                     </ul>
                   ) : (
                     <div className="p-2 text-sm rounded bg-green-500/15">
@@ -1846,7 +1849,7 @@ const Map2D = () => {
       { currentOpenedMenu === AvailableMenus.VIEW ? (<ViewMenu />) : null }
 
       {/* Menu exporter */}
-      { currentOpenedMenu === AvailableMenus.EXPORT ? (<ExportMenu />) : null }
+      { currentOpenedMenu === AvailableMenus.EXPORT ? (<ExportMenu printControlRef={printControlRef}  />) : null }
       
       {/* Indicateur de coordonnées */}
       <div className="absolute z-[1000] px-2 py-1 text-xs text-white rounded bottom-5 right-20 bg-black/70">
@@ -1891,7 +1894,7 @@ const Map2D = () => {
         </Button>
         
         {/* Bouton capture zone */}
-        <Button 
+        {/* <Button 
           onClick={() => {
             if (isSelectingArea) {
               cancelAreaSelection();
@@ -1904,7 +1907,7 @@ const Map2D = () => {
           title={isSelectingArea ? "Annuler la sélection" : "Sélectionner une zone à capturer"}
         >
           <Crop className="w-4 h-4" />
-        </Button>
+        </Button> */}
         
         {/* Bouton pour capturer la zone sélectionnée */}
         {isSelectingArea && selectionRect && (

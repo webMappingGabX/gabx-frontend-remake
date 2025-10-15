@@ -28,6 +28,7 @@ export interface PlanState {
     filters: {
         search?: string;
         sortBy?: string;
+        excludeType?: string[];
         sortOrder?: "ASC" | "DESC";
     };
 }
@@ -46,6 +47,7 @@ const initialState: PlanState = {
     },
     filters: {
         search: "",
+        excludeType: [],
         sortBy: "code",
         sortOrder: "ASC"
     }
@@ -57,6 +59,7 @@ export const fetchPlans = createAsyncThunk(
     async (params: {
         search?: string;
         page?: number;
+        excludeType?: string[];
         limit?: number;
         sortBy?: string;
         sortOrder?: "ASC" | "DESC";

@@ -8,6 +8,7 @@ import observationReducer from './slices/observationsSlice';
 import housingEstateReducer from './slices/housingEstateSlice';
 import dashboardReducer from './slices/dashboardSlice';
 import planReducer from './slices/planSlice';
+import buildingReducer from './slices/buildingSlice';
 // import userReducer from './slices/userSlice';
 
 const rootReducer = combineReducers({
@@ -18,7 +19,8 @@ const rootReducer = combineReducers({
   users: userReducer,
   observations: observationReducer,
   dashboard: dashboardReducer,
-  plan: planReducer
+  plan: planReducer,
+  building: buildingReducer
 });
 
 export default rootReducer;

@@ -13,6 +13,9 @@ import { Switch } from "../ui/switch";
 import { Textarea } from "../ui/textarea";
 import { Badge } from "../ui/badge";
 import { Slider } from "../ui/slider";
+import jsPDF from "jspdf";
+import domtoimage from 'dom-to-image-more';
+
 
 interface ExportConfig {
   format: "A4" | "A3" | "CUSTOM";
@@ -36,7 +39,7 @@ interface DataFilters {
   dateRange: string;
 }
 
-const ExportMenu = () => {
+const ExportMenu = ({ printControlRef }) => {
     const dispatch = useDispatch();
     const { toast } = useToast();
     
@@ -107,48 +110,542 @@ const ExportMenu = () => {
       }
     };
 
-    // Génération du PDF
+      const captureMapImage = async (map: L.Map) => {
+        const container = map.getContainer();
+      
+        const options = {
+          useCORS: true,
+          width: container.clientWidth,
+          height: container.clientHeight,
+          style: {
+            transform: "none",
+            position: "absolute",
+            top: "0px",
+            left: "0px",
+          },
+        };
+      
+        return await domtoimage.toPng(container, options);
+      };
+      
+      
+    
     const generatePDF = async () => {
-      if (!exportConfig.includeMap && !exportConfig.includeDataTable) {
-        toast({
-          title: "Configuration invalide",
-          description: "Sélectionnez au moins une option d'export (carte ou tableau)",
-          variant: "destructive"
-        });
-        return;
-      }
+        if (!printControlRef?.current?._map) {
+          toast({
+            title: "Erreur",
+            description: "Le contrôle d'impression n'est pas disponible",
+            variant: "destructive"
+          });
+          return;
+        }
+      
+        setIsGenerating(true);
+      
+        try {
+          const map = printControlRef.current._map;
+      
+          // 🖼️ Capture fidèle de la carte
+          const imageUrl = await captureMapImage(map);
+      
+          // 📄 Création du PDF
+          const pdf = new jsPDF({
+            orientation: exportConfig.orientation,
+            unit: "mm",
+            format: exportConfig.format.toLowerCase(),
+          });
+      
+          const margin = 15;
+          const pageWidth = pdf.internal.pageSize.getWidth();
+          const contentWidth = pageWidth - 2 * margin;
+          let y = 30;
+      
+          // 🔹 En-tête
+          /*pdf.setFillColor(41, 128, 185);
+          pdf.rect(0, 0, pageWidth, 25, "F");
+          pdf.setTextColor(255, 255, 255);
+          pdf.setFont("helvetica", "bold");
+          pdf.setFontSize(16);
+          pdf.text(exportTitle || "Rapport cartographique", margin, 15);
+      
+          // 🔹 Ajout de l'image capturée
+          
+          // 🔹 Pied de page
+          const footerY = pdf.internal.pageSize.getHeight() - 10;
+          pdf.setDrawColor(200, 200, 200);
+          pdf.line(margin, footerY - 5, pageWidth - margin, footerY - 5);
+          pdf.setTextColor(100, 100, 100);
+          pdf.setFontSize(8);
+          pdf.text(`Généré le ${new Date().toLocaleString("fr-FR")}`, margin, footerY);*/
+      
+          
+          
+          // 🔹 EN-TÊTE DU DOCUMENT
+          pdf.setFillColor(41, 128, 185);
+          pdf.rect(0, 0, pageWidth, 25, 'F');
+          
+          // Titre principal
+          pdf.setTextColor(255, 255, 255);
+          pdf.setFontSize(16);
+          pdf.setFont('helvetica', 'bold');
+          pdf.text(exportTitle, margin, 15);
+      
+          // Date de génération
+          const now = new Date();
+          const dateString = now.toLocaleDateString('fr-FR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+          pdf.setFontSize(8);
+          pdf.text(`Généré le: ${dateString}`, pageWidth - margin, 15, { align: 'right' });
+      
+          y = 30;
+      
+          // 🔹 DESCRIPTION
+          if (exportDescription) {
+            pdf.setTextColor(0, 0, 0);
+            pdf.setFontSize(10);
+            pdf.setFont('helvetica', 'normal');
+            const lines = pdf.splitTextToSize(exportDescription, contentWidth);
+            pdf.text(lines, margin, y);
+            y += lines.length * 4 + 8;
+          }
+      
+          // 🔹 INFORMATIONS CARTOGRAPHIQUES
+          const infoBoxHeight = 25;
+          pdf.setFillColor(245, 245, 245);
+          pdf.rect(margin, y, contentWidth, infoBoxHeight, 'F');
+          pdf.setDrawColor(200, 200, 200);
+          pdf.rect(margin, y, contentWidth, infoBoxHeight, 'S');
+      
+          pdf.setTextColor(0, 0, 0);
+          pdf.setFontSize(9);
+          pdf.setFont('helvetica', 'bold');
+          pdf.text("INFORMATIONS CARTOGRAPHIQUES", margin + 5, y + 7);
+      
+          pdf.setFont('helvetica', 'normal');
+          
+          // Échelle approximative (calcul basique)
+          const zoom = map.getZoom();
+          const scale = Math.round(591657550 / Math.pow(2, zoom - 1)); // Formule approximative
+          const scaleText = `1:${scale.toLocaleString()}`;
+          
+          // Centre de la carte
+          const center = map.getCenter();
+          const centerText = `${center.lat.toFixed(4)}°, ${center.lng.toFixed(4)}°`;
+      
+          pdf.text(`Échelle: ${scaleText}`, margin + 5, y + 14);
+          pdf.text(`Centre: ${centerText}`, margin + 5, y + 19);
+          pdf.text(`Zoom: ${zoom}`, margin + 80, y + 14);
+          
+          // Nombre d'éléments
+          // const featureCount = overlayPane ? overlayPane.querySelectorAll('path').length : 0;
+          // pdf.text(`Éléments: ${featureCount}`, margin + 80, y + 19);
+      
+          y += infoBoxHeight + 10;
+      
+          // 🔹 IMAGE DE LA CARTE
+          const imgProps = pdf.getImageProperties(imageUrl);
+          const pdfImgWidth = contentWidth;
+          const pdfImgHeight = (imgProps.height * pdfImgWidth) / imgProps.width;
+      
+          
+          // Vérifier si l'image dépasse la page
+          const remainingHeight = pdf.internal.pageSize.getHeight() - y - 30;
+          const finalImgHeight = Math.min(pdfImgHeight, remainingHeight);
+          const finalImgWidth = (pdfImgWidth * finalImgHeight) / pdfImgHeight;
+      
+          pdf.addImage(imageUrl, "PNG", margin, y, finalImgWidth, finalImgHeight);
+      
+          // 🔹 FLÈCHE NORD
+          const northArrowY = y + 10;
+          const northArrowX = pageWidth - margin - 15;
+          
+          // Dessiner la flèche Nord
+          pdf.setFillColor(0, 0, 0);
+          pdf.setFontSize(8);
+          pdf.text('N', northArrowX - 1, northArrowY - 5);
+          
+          // Triangle de la flèche
+          pdf.triangle(
+            northArrowX, northArrowY,
+            northArrowX - 4, northArrowY + 8,
+            northArrowX + 4, northArrowY + 8,
+            'F'
+          );
+          
+          // Cercle autour
+          pdf.setDrawColor(0, 0, 0);
+          pdf.circle(northArrowX, northArrowY + 4, 6, 'S');
+      
+          y += finalImgHeight + 10;
+      
+          // 🔹 ÉCHELLE GRAPHIQUE
+          const scaleBarY = y - 15;
+          const scaleBarWidth = 50; // mm
+          const realDistance = Math.round((scale * scaleBarWidth) / 1000); // en mètres
+          
+          // Barre d'échelle
+          pdf.setFillColor(0, 0, 0);
+          pdf.rect(margin, scaleBarY, scaleBarWidth, 2, 'F');
+          
+          // Subdivisions
+          pdf.rect(margin, scaleBarY - 3, 1, 8, 'F'); // Début
+          pdf.rect(margin + scaleBarWidth/2, scaleBarY - 2, 1, 6, 'F'); // Milieu
+          pdf.rect(margin + scaleBarWidth, scaleBarY - 3, 1, 8, 'F'); // Fin
+          
+          // Texte de l'échelle
+          pdf.setFontSize(7);
+          pdf.text('0', margin - 1, scaleBarY + 10);
+          pdf.text(`${realDistance/2}m`, margin + (scaleBarWidth/2) - 5, scaleBarY + 10);
+          pdf.text(`${realDistance}m`, margin + scaleBarWidth - 5, scaleBarY + 10);
+          pdf.text('ÉCHELLE', margin - 1, scaleBarY - 8);
+      
+          // 🔹 PIED DE PAGE
+          const footerY = pdf.internal.pageSize.getHeight() - 10;
+          
+          pdf.setDrawColor(200, 200, 200);
+          pdf.line(margin, footerY - 5, pageWidth - margin, footerY - 5);
+          
+          pdf.setTextColor(100, 100, 100);
+          pdf.setFontSize(7);
+          pdf.setFont('helvetica', 'normal');
+          
+          // Informations de pied de page
+          const footerText = `Cartographie générée par SIG App • Page 1/1 • Données: OpenStreetMap • ${dateString}`;
+          pdf.text(footerText, margin, footerY);
+      
+          // 🔹 LÉGENDE (exemple simple)
+          const legendY = y;
+          if (legendY < pdf.internal.pageSize.getHeight() - 30) {
+            pdf.setFillColor(245, 245, 245);
+            pdf.rect(margin, legendY, contentWidth, 20, 'F');
+            pdf.setDrawColor(200, 200, 200);
+            pdf.rect(margin, legendY, contentWidth, 20, 'S');
+            
+            pdf.setTextColor(0, 0, 0);
+            pdf.setFontSize(8);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text("LÉGENDE", margin + 5, legendY + 7);
+            
+            pdf.setFont('helvetica', 'normal');
+            
+            // Exemples d'éléments de légende
+            pdf.setFillColor(16, 185, 129); // Vert pour parcelles
+            pdf.rect(margin + 5, legendY + 12, 4, 4, 'F');
+            pdf.text("Parcelles", margin + 12, legendY + 15);
+            
+            pdf.setFillColor(245, 158, 66); // Orange pour bâtiments
+            pdf.rect(margin + 45, legendY + 12, 4, 4, 'F');
+            pdf.text("Bâtiments", margin + 52, legendY + 15);
+            
+            pdf.setFillColor(239, 68, 68); // Rouge pour intersections
+            pdf.rect(margin + 85, legendY + 12, 4, 4, 'F');
+            pdf.text("Empiètements", margin + 92, legendY + 15);
+          }
 
-      setIsGenerating(true);
+            // 💾 Sauvegarde
+            pdf.save(`${exportTitle.replace(/\s+/g, "_")}_${Date.now()}.pdf`);
 
-      try {
-        // Simulation de la génération du PDF
-        await new Promise(resolve => setTimeout(resolve, 3000));
-
-        // Ici, vous intégreriez une bibliothèque comme jsPDF ou html2canvas
-        // pour générer le PDF réel
-
-        const selectedCount = selectedProperties.length || mockProperties.length;
-        
-        toast({
-          title: "PDF généré avec succès",
-          description: `Rapport exporté avec ${selectedCount} propriété(s)`,
-          variant: "default"
-        });
-
-        // Simulation du téléchargement
-        simulateDownload();
-
-      } catch (error) {
-        console.error("Erreur lors de la génération du PDF:", error);
-        toast({
-          title: "Erreur",
-          description: "Impossible de générer le PDF",
-          variant: "destructive"
-        });
-      } finally {
-        setIsGenerating(false);
-      }
+          toast({
+            title: "PDF généré avec succès",
+            description: "La carte a été intégrée avec la qualité de Leaflet EasyPrint",
+          });
+        } catch (error) {
+          console.error("Erreur lors de la génération du PDF:", error);
+          toast({
+            title: "Erreur",
+            description: "Impossible de générer le PDF",
+            variant: "destructive",
+          });
+        } finally {
+          setIsGenerating(false);
+        }
     };
+      
+      
+      
+    /*const generatePDF = async () => {
+        if (!exportConfig.includeMap && !exportConfig.includeDataTable) {
+          toast({
+            title: "Configuration invalide",
+            description: "Sélectionnez au moins une option d'export (carte ou tableau)",
+            variant: "destructive"
+          });
+          return;
+        }
+      
+        setIsGenerating(true);
+      
+        try {
+          if (!printControlRef?.current?._map) {
+            throw new Error("Le contrôle d'impression n'est pas disponible");
+          }
+      
+          const map = printControlRef.current._map;
+          const mapContainer = map.getContainer();
+          const tilePane = mapContainer.querySelector('.leaflet-tile-pane');
+          const overlayPane = mapContainer.querySelector('.leaflet-overlay-pane');
+      
+          const width = mapContainer.clientWidth;
+          const height = mapContainer.clientHeight;
+      
+          // 1️⃣ Créer un canvas temporaire
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+      
+          // Fond blanc
+          //ctx.fillStyle = '#ffffff';
+          //ctx.fillRect(0, 0, width, height);
+      
+          // 2️⃣ Dessiner les tuiles raster
+          if (tilePane) {
+            const images = tilePane.querySelectorAll('img');
+            images.forEach((img) => {
+              const transform = img.style.transform || "";
+              const match = transform.match(/translate3d\((-?\d+)px, (-?\d+)px/);
+              if (match) {
+                const x = parseFloat(match[1]);
+                const y = parseFloat(match[2]);
+                try {
+                  ctx.drawImage(img, x, y);
+                } catch (e) {
+                  console.warn("Erreur dessin tuile:", e);
+                }
+              }
+            });
+          }
+      
+          // 3️⃣ Dessiner les couches vectorielles
+          if (overlayPane) {
+            const svg = overlayPane.querySelector('svg');
+            if (svg) {
+              const xml = new XMLSerializer().serializeToString(svg);
+              const svg64 = btoa(unescape(encodeURIComponent(xml)));
+              const imageSrc = 'data:image/svg+xml;base64,' + svg64;
+      
+              const image = new Image();
+              image.crossOrigin = "anonymous";
+              await new Promise((resolve) => {
+                image.onload = () => {
+                  ctx.drawImage(image, 0, 0);
+                  resolve(null);
+                };
+                image.src = imageSrc;
+              });
+            }
+          }
+      
+          //const overlayCanvas = overlayPane.querySelector('canvas');
+          //if (overlayCanvas) ctx.drawImage(overlayCanvas, 0, 0);
+      
+          // 4️⃣ Extraire l'image finale
+          const imageUrl = canvas.toDataURL('image/png');
+      
+          const pdf = new jsPDF({
+            orientation: exportConfig.orientation,
+            unit: "mm",
+            format: exportConfig.format.toLowerCase(),
+          });
+      
+          const margin = 15;
+          const pageWidth = pdf.internal.pageSize.getWidth();
+          const contentWidth = pageWidth - (2 * margin);
+          let y = margin;
+      
+          // 🔹 EN-TÊTE DU DOCUMENT
+          pdf.setFillColor(41, 128, 185);
+          pdf.rect(0, 0, pageWidth, 25, 'F');
+          
+          // Titre principal
+          pdf.setTextColor(255, 255, 255);
+          pdf.setFontSize(16);
+          pdf.setFont('helvetica', 'bold');
+          pdf.text(exportTitle, margin, 15);
+      
+          // Date de génération
+          const now = new Date();
+          const dateString = now.toLocaleDateString('fr-FR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+          pdf.setFontSize(8);
+          pdf.text(`Généré le: ${dateString}`, pageWidth - margin, 15, { align: 'right' });
+      
+          y = 30;
+      
+          // 🔹 DESCRIPTION
+          if (exportDescription) {
+            pdf.setTextColor(0, 0, 0);
+            pdf.setFontSize(10);
+            pdf.setFont('helvetica', 'normal');
+            const lines = pdf.splitTextToSize(exportDescription, contentWidth);
+            pdf.text(lines, margin, y);
+            y += lines.length * 4 + 8;
+          }
+      
+          // 🔹 INFORMATIONS CARTOGRAPHIQUES
+          const infoBoxHeight = 25;
+          pdf.setFillColor(245, 245, 245);
+          pdf.rect(margin, y, contentWidth, infoBoxHeight, 'F');
+          pdf.setDrawColor(200, 200, 200);
+          pdf.rect(margin, y, contentWidth, infoBoxHeight, 'S');
+      
+          pdf.setTextColor(0, 0, 0);
+          pdf.setFontSize(9);
+          pdf.setFont('helvetica', 'bold');
+          pdf.text("INFORMATIONS CARTOGRAPHIQUES", margin + 5, y + 7);
+      
+          pdf.setFont('helvetica', 'normal');
+          
+          // Échelle approximative (calcul basique)
+          const zoom = map.getZoom();
+          const scale = Math.round(591657550 / Math.pow(2, zoom - 1)); // Formule approximative
+          const scaleText = `1:${scale.toLocaleString()}`;
+          
+          // Centre de la carte
+          const center = map.getCenter();
+          const centerText = `${center.lat.toFixed(4)}°, ${center.lng.toFixed(4)}°`;
+      
+          pdf.text(`Échelle: ${scaleText}`, margin + 5, y + 14);
+          pdf.text(`Centre: ${centerText}`, margin + 5, y + 19);
+          pdf.text(`Zoom: ${zoom}`, margin + 80, y + 14);
+          
+          // Nombre d'éléments
+          const featureCount = overlayPane ? overlayPane.querySelectorAll('path').length : 0;
+          pdf.text(`Éléments: ${featureCount}`, margin + 80, y + 19);
+      
+          y += infoBoxHeight + 10;
+      
+          // 🔹 IMAGE DE LA CARTE
+          const imgProps = pdf.getImageProperties(imageUrl);
+          const pdfImgWidth = contentWidth;
+          const pdfImgHeight = (imgProps.height * pdfImgWidth) / imgProps.width;
+          
+          // Vérifier si l'image dépasse la page
+          const remainingHeight = pdf.internal.pageSize.getHeight() - y - 30;
+          const finalImgHeight = Math.min(pdfImgHeight, remainingHeight);
+          const finalImgWidth = (pdfImgWidth * finalImgHeight) / pdfImgHeight;
+      
+          pdf.addImage(imageUrl, "PNG", margin, y, finalImgWidth, finalImgHeight);
+      
+          // 🔹 FLÈCHE NORD
+          const northArrowY = y + 10;
+          const northArrowX = pageWidth - margin - 15;
+          
+          // Dessiner la flèche Nord
+          pdf.setFillColor(0, 0, 0);
+          pdf.setFontSize(8);
+          pdf.text('N', northArrowX - 1, northArrowY - 5);
+          
+          // Triangle de la flèche
+          pdf.triangle(
+            northArrowX, northArrowY,
+            northArrowX - 4, northArrowY + 8,
+            northArrowX + 4, northArrowY + 8,
+            'F'
+          );
+      
+          // Cercle autour
+          pdf.setDrawColor(0, 0, 0);
+          pdf.circle(northArrowX, northArrowY + 4, 6, 'S');
+      
+          y += finalImgHeight + 10;
+      
+          // 🔹 ÉCHELLE GRAPHIQUE
+          const scaleBarY = y - 15;
+          const scaleBarWidth = 50; // mm
+          const realDistance = Math.round((scale * scaleBarWidth) / 1000); // en mètres
+          
+          // Barre d'échelle
+          pdf.setFillColor(0, 0, 0);
+          pdf.rect(margin, scaleBarY, scaleBarWidth, 2, 'F');
+          
+          // Subdivisions
+          pdf.rect(margin, scaleBarY - 3, 1, 8, 'F'); // Début
+          pdf.rect(margin + scaleBarWidth/2, scaleBarY - 2, 1, 6, 'F'); // Milieu
+          pdf.rect(margin + scaleBarWidth, scaleBarY - 3, 1, 8, 'F'); // Fin
+          
+          // Texte de l'échelle
+          pdf.setFontSize(7);
+          pdf.text('0', margin - 1, scaleBarY + 10);
+          pdf.text(`${realDistance/2}m`, margin + (scaleBarWidth/2) - 5, scaleBarY + 10);
+          pdf.text(`${realDistance}m`, margin + scaleBarWidth - 5, scaleBarY + 10);
+          pdf.text('ÉCHELLE', margin - 1, scaleBarY - 8);
+      
+          // 🔹 PIED DE PAGE
+          const footerY = pdf.internal.pageSize.getHeight() - 10;
+          
+          pdf.setDrawColor(200, 200, 200);
+          pdf.line(margin, footerY - 5, pageWidth - margin, footerY - 5);
+          
+          pdf.setTextColor(100, 100, 100);
+          pdf.setFontSize(7);
+          pdf.setFont('helvetica', 'normal');
+          
+          // Informations de pied de page
+          const footerText = `Cartographie générée par SIG App • Page 1/1 • Données: OpenStreetMap • ${dateString}`;
+          pdf.text(footerText, margin, footerY);
+      
+          // 🔹 LÉGENDE (exemple simple)
+          const legendY = y;
+          if (legendY < pdf.internal.pageSize.getHeight() - 30) {
+            pdf.setFillColor(245, 245, 245);
+            pdf.rect(margin, legendY, contentWidth, 20, 'F');
+            pdf.setDrawColor(200, 200, 200);
+            pdf.rect(margin, legendY, contentWidth, 20, 'S');
+            
+            pdf.setTextColor(0, 0, 0);
+            pdf.setFontSize(8);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text("LÉGENDE", margin + 5, legendY + 7);
+            
+            pdf.setFont('helvetica', 'normal');
+            
+            // Exemples d'éléments de légende
+            pdf.setFillColor(16, 185, 129); // Vert pour parcelles
+            pdf.rect(margin + 5, legendY + 12, 4, 4, 'F');
+            pdf.text("Parcelles", margin + 12, legendY + 15);
+            
+            pdf.setFillColor(245, 158, 66); // Orange pour bâtiments
+            pdf.rect(margin + 45, legendY + 12, 4, 4, 'F');
+            pdf.text("Bâtiments", margin + 52, legendY + 15);
+            
+            pdf.setFillColor(239, 68, 68); // Rouge pour intersections
+            pdf.rect(margin + 85, legendY + 12, 4, 4, 'F');
+            pdf.text("Empiètements", margin + 92, legendY + 15);
+          }
+      
+          // 💾 TÉLÉCHARGER LE PDF
+          pdf.save(`${exportTitle.replace(/\s+/g, "_")}_${now.getTime()}.pdf`);
+      
+          toast({
+            title: "PDF généré avec succès",
+            description: "Rapport cartographique exporté avec les informations complètes",
+            variant: "default",
+          });
+      
+        } catch (error) {
+          console.error("Erreur lors de la génération du PDF:", error);
+          toast({
+            title: "Erreur",
+            description: "Impossible de générer le PDF",
+            variant: "destructive",
+          });
+        } finally {
+          setIsGenerating(false);
+        }
+    };*/
+    
+
 
     // Simulation du téléchargement
     const simulateDownload = () => {

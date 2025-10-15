@@ -357,6 +357,9 @@ const FileMenu = () => {
                     }
 
                     const response2 = await dispatch(createBuilding(buildingData));
+                    total++;
+
+                    if(total >= plotData.max) break;
                 }
             }
 
@@ -756,7 +759,7 @@ const FileMenu = () => {
                                                     disabled={!selectedHousingEstate && !showHousingEstateForm}
                                                 >
                                                     <Satellite className="w-4 h-4 mr-2" />
-                                                    {hasExistingOrthophoto ? 'Remplacer l\'orthophoto' : 'Importer l\'orthophoto'}
+                                                    {hasExistingOrthophoto ? 'Remplacer l\'orthophoto' : 'Importer les données de l\'orthophoto'}
                                                     {hasExistingOrthophoto && <span className="ml-2">⚠️</span>}
                                                 </Button>
                                                 

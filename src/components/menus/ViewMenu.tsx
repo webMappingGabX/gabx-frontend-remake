@@ -2,7 +2,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent } from "../ui/card";
 import { Button } from "../ui/button";
 import { Search, Eye, X, Filter, MapPin, Home, Building } from "lucide-react";
-import { closeMenu, selectOverlaps, selectSearch, toggleOverlaps, toggleSearch } from "../../app/store/slices/settingSlice";
+import { closeMenu, selectExcludedTypes, selectOverlaps, selectSearch, toggleOverlaps, toggleSearch, toggleType } from "../../app/store/slices/settingSlice";
 import { useDispatch, useSelector } from "react-redux";
 import { useToast } from "../../hooks/useToast";
 import { useEffect, useState } from "react";
@@ -41,6 +41,7 @@ const ViewMenu = () => {
 
     const selectSearchFromState = useSelector(selectSearch);
     const selectOverlapsFromState = useSelector(selectOverlaps);
+    const selectExcludeTypesFS = useSelector(selectExcludedTypes);
 
     // Données simulées pour les empiètements
     const mockOverlappingAreas = [
@@ -73,12 +74,18 @@ const ViewMenu = () => {
     // Charger les empiètements au montage
     useEffect(() => {
       // Simuler le chargement des données d'empiètement
-      setOverlappingAreas(mockOverlappingAreas);
-    }, []);
+      //setOverlappingAreas(mockOverlappingAreas);
+    }, [selectExcludeTypesFS]);
 
     // Gestion des options d'affichage
     const handleViewOverlapChange = () => {
         dispatch(toggleOverlaps());
+    }
+
+    const handleViewTypeChange = (type: string) => {
+        const response = dispatch(toggleType(type));
+
+        console.log("RESPONSE TYPE CHANGE", response);
     }
 
     /*useEffect(() => {
@@ -182,6 +189,33 @@ const ViewMenu = () => {
                                             />
                                         </div>
                                     </div>
+
+                                    <div className="space-y-2 mt-1">
+                                        <h4>Geographie</h4>
+                                        <div className="flex items-center justify-between">
+                                            <Label className="text-sm">Plan de masse</Label>
+                                            <Switch
+                                                checked={!selectExcludeTypesFS?.includes("PLAN_DE_MASSE")}
+                                                onCheckedChange={() => handleViewTypeChange("PLAN_DE_MASSE")}
+                                            />
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <Label className="text-sm">Ortophoto</Label>
+                                            <Switch
+                                                checked={!selectExcludeTypesFS?.includes("ORTHO_PHOTO")}
+                                                onCheckedChange={() => handleViewTypeChange("ORTHO_PHOTO")}
+                                            />
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <Label className="text-sm">Couche Supplementaire</Label>
+                                            <Switch
+                                                checked={!selectExcludeTypesFS?.includes("PERSO")}
+                                                onCheckedChange={() => handleViewTypeChange("PERSO")}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    
                                 </div>
 
                                 {/* Empiettements */}
