@@ -262,11 +262,20 @@ const Map2D = () => {
           sizeModes: ['Current', 'A4Landscape', 'A4Portrait'],
           exportOnly: true,
           hideControlContainer: true,
-          autoPrint: false
+          autoPrint: false,
+          className: 'd-none' // Ajoute une classe pour masquer le bouton
         });
-        
+
         printControl.addTo(mapInstance.current);
         printControlRef.current = printControl;
+
+        // Cacher explicitement l'icône EasyPrint après ajout (fallback)
+        setTimeout(() => {
+          const printBtn = document.querySelector('.leaflet-control-easyPrint');
+          if (printBtn) {
+            (printBtn as HTMLElement).style.display = 'none';
+          }
+        }, 300);
         
         console.log("EasyPrint control initialized successfully");
       } catch (error) {
@@ -1882,7 +1891,7 @@ const Map2D = () => {
       {/* Barre d'outils principale */}
       <div className="absolute z-[1000] flex flex-col gap-2 top-14 right-4">
         {/* Bouton capture complète */}
-        <Button 
+        {/* <Button 
           onClick={captureFullMap} 
           //onClick={captureFullMapEP} 
           size="icon" 
@@ -1891,7 +1900,7 @@ const Map2D = () => {
           disabled={isSelectingArea}
         >
           <Camera className="w-4 h-4" />
-        </Button>
+        </Button> */}
         
         {/* Bouton capture zone */}
         {/* <Button 
