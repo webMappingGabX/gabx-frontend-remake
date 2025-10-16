@@ -180,6 +180,37 @@ const MapToolbar = () => {
                 </motion.div>
                 );
             })}
+                <motion.div
+                    key="osm-buildings"
+                    whileHover={{ y: -2 }}
+                    whileTap={{ scale: 0.95 }}
+                >
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex flex-col items-center w-auto h-12 p-0 cursor-pointer min-w-12"
+                        onClick={() => {
+                            const isOsmBuildings = window.location.pathname.startsWith('/map/osm-buildings');
+                            const isMap2D = window.location.pathname.startsWith('/map/2d');
+                            if (!isOsmBuildings) {
+                                window.location.href = "/map/osm-buildings";
+                            } else if (!isMap2D) {
+                                window.location.href = "/map/2d";
+                            }
+                        }}
+                    >
+                        <span className="mb-1">
+                            <svg width="16" height="16" fill="none" viewBox="0 0 16 16">
+                                <rect x="2" y="4" width="12" height="9" rx="2" fill="currentColor" className="text-green-700 dark:text-green-400"/>
+                                <rect x="5" y="1" width="6" height="3" rx="1" fill="currentColor" className="text-gray-500 dark:text-gray-400"/>
+                                <rect x="7" y="7" width="2" height="6" rx="0.5" fill="white" opacity="0.6"/>
+                            </svg>
+                        </span>
+                        <span className="text-xs">
+                            {window.location.pathname.startsWith('/map/osm-buildings') ? "Carte 2D" : "Carte 3D"}
+                        </span>
+                    </Button>
+                </motion.div>
             </div>
         </div>
 

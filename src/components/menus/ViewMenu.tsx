@@ -174,13 +174,13 @@ const ViewMenu = () => {
                                     </h3>
                                     
                                     <div className="space-y-2">
-                                        <div className="flex items-center justify-between">
+                                        {/* <div className="flex items-center justify-between">
                                             <Label className="text-sm">Intersections</Label>
                                             <Switch
                                                 checked={selectOverlapsFromState}
                                                 onCheckedChange={handleViewOverlapChange}
                                             />
-                                        </div>
+                                        </div> */}
                                         <div className="flex items-center justify-between">
                                             <Label className="text-sm">Champ de recherche</Label>
                                             <Switch

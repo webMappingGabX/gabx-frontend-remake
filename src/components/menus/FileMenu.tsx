@@ -460,7 +460,7 @@ const FileMenu = () => {
             });
 
             // Réinitialiser l'état
-            /*setImportedFile(null);
+            setImportedFile(null);
             setTfImported(null);
             setGeojsonData(null);
             setShowHousingEstateForm(false);
@@ -488,7 +488,7 @@ const FileMenu = () => {
                 status: undefined,
                 buildings: [],
                 max: 200
-            });*/
+            });
 
         } catch (error) {
             console.log("ERROR", error);

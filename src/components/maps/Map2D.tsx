@@ -63,6 +63,10 @@ interface Parcelle {
   department?: any;
   arrondissement?: any;
   geom?: any;
+  fraud?: boolean; // ← AJOUTER CETTE LIGNE
+  state?: string; // ← AJOUTER CETTE LIGNE si elle n'existe pas
+  nbLevels?: number; // ← AJOUTER CETTE LIGNE si elle n'existe pas
+  plot?: any;
 }
 
 interface Intersection {
@@ -162,6 +166,14 @@ const Map2D = () => {
     fillOpacity: 0.2,
   };
 
+  const fraudStyle = {
+    color: '#dc2626', // Rouge vif
+    weight: 3,
+    fillColor: '#dc2626',
+    fillOpacity: 0.4,
+    dashArray: '5, 5' // Pointillés pour encore plus de visibilité
+  };
+  
   // Fonction pour calculer les intersections
   const calculateIntersections = () => {
     if (!parcelleLayers || !selectOverlapsFS) return;
@@ -409,9 +421,19 @@ const Map2D = () => {
         fillOpacity: 0.2
       });*/
 
-      const finalStyle = selectedParcelle?.id === parcelle.id ? selectionStyle : uniStyle;
+      // const finalStyle = selectedParcelle?.id === parcelle.id ? selectionStyle : uniStyle;
+      // const polygon = L.polygon(parcelle.coordinates, finalStyle);
+      let finalStyle;
+      if (selectedParcelle?.id === parcelle.id) {
+        finalStyle = selectionStyle;
+      } else if (!parcelle.fraud) {
+        finalStyle = fraudStyle; // Style pour les fraudes
+      } else {
+        finalStyle = uniStyle; // Style normal
+      }
+
       const polygon = L.polygon(parcelle.coordinates, finalStyle);
-      
+
       // Ajouter un popup au polygone
       polygon.bindPopup(`
         <div>
@@ -1659,31 +1681,42 @@ const Map2D = () => {
           animate={{ opacity: 1, y: 0 }}
           className="absolute z-[1000] max-w-sm top-14 left-4"
         >
-          <Card className="py-2">
+          <Card className={`py-2 ${!selectedParcelle.fraud ? 'border-red-300 bg-red-50' : ''}`}>
             <CardContent className="p-4">
               <div className="flex items-start justify-between">
                 <div>
-                  <h3 className="text-lg font-bold">{selectedParcelle.code || "Non spécifié"}</h3>
+                  {/* AJOUTER L'ALERTE FRAUDE EN HAUT */}
+                  {!selectedParcelle.fraud && (
+                    <div className="p-2 mb-3 text-sm font-bold text-center text-white bg-red-600 rounded-md">
+                      ⚠️ BATIMENT FRAUDULEUX
+                    </div>
+                  )}
+                  
+                  <h3 className={`text-lg font-bold ${!selectedParcelle.fraud ? 'text-red-700' : ''}`}>
+                    {selectedParcelle.code || "Non spécifié"}
+                  </h3>
                   <p className="pb-2 text-sm text-slate-600 dark:text-slate-400">
                     SURFACE: {selectedParcelle.area} ha
                   </p>
-                  {/* <p className="text-sm">Titre foncié: {selectedParcelle?.plot?.TFnumber != null ? selectedParcelle?.plot?.TFnumber : "Non spécifié"}</p>
-                  <p className="text-sm">Prix: {selectedParcelle?.plot?.price | 0} XAF</p>
-                  <p className="text-sm">Lieu: {selectedParcelle?.plot?.plan?.housingEstate.place != null ? selectedParcelle?.plot?.plan?.housingEstate.place : "Non spécifié"}</p>
-                  <p className="text-sm">Année d'acquisition : {selectedParcelle?.plot?.acquiredYear != null ? selectedParcelle?.plot?.acquiredYear : "Non spécifiée"}</p> */}
                   <p className="text-sm">Etat : {selectedParcelle?.state != null ? selectedParcelle?.state : "Non spécifié"}</p>
                   <p className="text-sm">Nombre de niveaux : {selectedParcelle?.nbLevels != null ? selectedParcelle?.nbLevels : "Non spécifié"}</p>
                   <p className="text-sm">Cité : {selectedParcelle?.plot?.housingEstate != null ? selectedParcelle?.plot?.housingEstate.name : "Aucune"}</p>
                   
+                  {/* AJOUTER L'INDICATEUR FRAUDE DANS LES INFORMATIONS */}
+                  {!selectedParcelle.fraud && (
+                    <div className="p-2 mt-2 text-sm font-medium text-red-800 bg-red-100 rounded">
+                      <strong>Statut:</strong> Batiment frauduleux détecté
+                    </div>
+                  )}
                   
                   {selectedParcelle?.plot?.housingEstate.region != null ? (
-                    <ul className="p-2 list-none rounded bg-green-500/15">
+                    <ul className="p-2 mt-2 list-none rounded bg-green-500/15">
                       <li className="text-sm">Région : {selectedParcelle?.plot?.housingEstate.region.name}</li>
                       <li className="text-sm">Département : {selectedParcelle?.plot?.housingEstate.department != null ? selectedParcelle?.plot?.housingEstate.department.name : "Non spécifié"}</li>
                       <li className="text-sm">Arrondissement : {selectedParcelle?.plot?.housingEstate.arrondissement != null ? selectedParcelle?.plot?.housingEstate.arrondissement.name : "Non spécifié"}</li>
                     </ul>
                   ) : (
-                    <div className="p-2 text-sm rounded bg-green-500/15">
+                    <div className="p-2 mt-2 text-sm rounded bg-green-500/15">
                       Localisation non spécifiée
                     </div>
                   )}
@@ -1697,13 +1730,12 @@ const Map2D = () => {
                 </Button>
               </div>
               <div className="flex gap-2 mt-3">
-                {/* <Button size="sm" variant="outline">Modifier la géométrie</Button> */}
                 <Button size="sm" className="cursor-pointer" onClick={() => {
                   dispatch(setCurrentPlot(selectedParcelle));
-                  
-                  //navigate("/map/plot-edition", { state: { plotId: selectedParcelle.id } });
                   navigate("/map/plot-edition", { state: { editingMode: true } });
-                }}>Modifier les infos</Button>
+                }}>
+                  Modifier les infos
+                </Button>
                 <Button size="sm" className="bg-red-400 cursor-pointer hover:bg-red-600" onClick={() => setConfirmPopupVisible(true)}>
                   Supprimer
                 </Button>

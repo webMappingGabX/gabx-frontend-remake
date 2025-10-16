@@ -37,6 +37,7 @@ import EditionMenu from "../menus/EditionMenu";
 import ViewMenu from "../menus/ViewMenu";
 import ExportMenu from "../menus/ExportMenu";
 import type { PickingInfo, MapViewState } from '@deck.gl/core';
+import proj4 from "proj4";
 
 // Style de fond raster OSM
 const CUSTOM_STYLE = {
@@ -125,6 +126,7 @@ export default function OSMBuildingsMap() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
+  proj4.defs("EPSG:32632", "+proj=utm +zone=32 +datum=WGS84 +units=m +no_defs");
   // Sélecteurs Redux (identique à Map2D)
   const isSearchActive = useSelector(selectSearch);
   const isLayersActive = useSelector(selectLayers);
@@ -153,7 +155,7 @@ export default function OSMBuildingsMap() {
               ring.map((coord: any) => {
                 // Convertir [lat, lng] vers [lng, lat] pour DeckGL
                 if (Array.isArray(coord) && coord.length >= 2) {
-                  return [coord[1], coord[0]]; // [lng, lat]
+                  return [coord[0], coord[1]]; // [lng, lat]
                 }
                 return coord;
               })
@@ -186,7 +188,7 @@ export default function OSMBuildingsMap() {
           const coordinates = geom.coordinates.map((ring: any) =>
             ring.map((coord: any) => {
               if (Array.isArray(coord) && coord.length >= 2) {
-                return [coord[1], coord[0]]; // [lng, lat]
+                return [coord[0], coord[1]]; // [lng, lat]
               }
               return coord;
             })
@@ -487,7 +489,7 @@ export default function OSMBuildingsMap() {
   return (
     <div className="relative w-full h-full overflow-hidden bg-slate-100 dark:bg-slate-900">
       {/* Carte DeckGL avec les mêmes données que Map2D */}
-      <DeckGL
+      {/* <DeckGL
         ref={deckRef}
         viewState={viewState}
         onViewStateChange={handleViewStateChange}
@@ -518,8 +520,22 @@ export default function OSMBuildingsMap() {
           style={{ width: "100%", height: "100%" }}
           reuseMaps={true}
         />
-      </DeckGL>
+      </DeckGL> */}
 
+      <DeckGL
+        ref={deckRef}
+        viewState={viewState}
+        onViewStateChange={handleViewStateChange}
+        controller={true}
+        layers={layers}
+        glOptions={{ stencil: true }}
+      >
+        <Map
+          mapStyle={CUSTOM_STYLE}
+          style={{ position: "absolute", width: "100%", height: "100%" }}
+          reuseMaps
+        />
+      </DeckGL>
       {/* ConfirmDialog (identique à Map2D) */}
       <ConfirmDialog 
         isOpen={confirmPopupVisible}
