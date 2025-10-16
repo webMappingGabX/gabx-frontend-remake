@@ -363,6 +363,7 @@ const FileMenu = () => {
 
                     }
 
+                    //console.log("BUILDING DATA   ", buildingData);
                     //const response2 = await dispatch(createBuilding(buildingData));
                     const response2 = await dispatch(createBuilding(buildingData));
                     total++;
