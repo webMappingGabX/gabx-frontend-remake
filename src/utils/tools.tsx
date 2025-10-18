@@ -48,3 +48,33 @@ export const multiPolygonToPolygon = (geometry: Record<string, any>): Record<str
   }
   return geometry;
 };
+
+// Fonction pour calculer la surface d'un polygone en mètres carrés
+export const calculatePolygonArea = (coordinates: [number, number][]) => {
+  if (!coordinates || coordinates.length < 3) return 0;
+  
+  let area = 0;
+  const n = coordinates.length;
+  
+  // Algorithme de Gauss pour calculer la surface d'un polygone
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    area += coordinates[i][1] * coordinates[j][0]; // lat1 * lng2
+    area -= coordinates[j][1] * coordinates[i][0]; // lat2 * lng1
+  }
+  
+  // Convertir en mètres carrés (approximation pour les coordonnées géographiques)
+  const areaInSquareDegrees = Math.abs(area) / 2;
+  
+  // Conversion approximative degrés -> mètres (plus précis près de l'équateur)
+  // 1 degré de latitude ≈ 111 320 m
+  // 1 degré de longitude ≈ 111 320 m * cos(latitude)
+  const avgLatitude = coordinates.reduce((sum, coord) => sum + coord[0], 0) / coordinates.length;
+  const metersPerDegreeLat = 111320; // Environ 111.32 km par degré de latitude
+  const metersPerDegreeLng = 111320 * Math.cos((avgLatitude * Math.PI) / 180);
+  
+  // Approximation de la surface en mètres carrés
+  const areaInSquareMeters = areaInSquareDegrees * metersPerDegreeLat * metersPerDegreeLng;
+  
+  return parseFloat(areaInSquareMeters.toFixed(2));
+};

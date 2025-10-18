@@ -12,7 +12,8 @@ import {
   Map,
   BarChart3,
   Shield,
-  Home
+  Home,
+  Building
 } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { useDispatch, useSelector } from "react-redux";
@@ -70,8 +71,14 @@ const DashboardLayout = () => {
     {
       name: "Cités",
       href: "/dashboard/housing-estates",
-      icon: Binoculars,
+      icon: Home, // Use Home icon for Cités
       isActive: location.pathname.startsWith("/dashboard/housing-estates")
+    },
+    {
+      name: "Bâtiments",
+      href: "/dashboard/buildings",
+      icon: Building, // Use Building icon for Bâtiments
+      isActive: location.pathname.startsWith("/dashboard/buildings")
     },
     /*{
       name: "Rapports",

@@ -122,6 +122,11 @@ const Map2D = () => {
   const navigate = useNavigate();
   const [parcelles, setParcelles] = useState<Parcelle[]>([]);
 
+  // Calcul de la surface totale des parcelles frauduleuses en m²
+  const totalFraudArea = parcelles
+    .filter(parcelle => !parcelle.fraud) // Note: ajustez selon votre logique
+    .reduce((total, parcelle) => total + (parcelle.area || 0), 0);
+
   const [isSelectingArea, setIsSelectingArea] = useState(false);
   const [isDrawingArea, setIsDrawingArea] = useState(false);
   const [selectionRect, setSelectionRect] = useState<{
@@ -172,6 +177,24 @@ const Map2D = () => {
     fillColor: '#dc2626',
     fillOpacity: 0.4,
     dashArray: '5, 5' // Pointillés pour encore plus de visibilité
+  };
+  
+  // Fonction pour calculer la surface d'un polygone en mètres carrés avec Turf.js
+  const calculatePolygonArea = (coordinates: [number, number][]) => {
+    if (!coordinates || coordinates.length < 3) return 0;
+    
+    try {
+      // Créer un polygone GeoJSON
+      const polygon = turf.polygon([coordinates]);
+      
+      // Calculer la surface en mètres carrés
+      const area = turf.area(polygon);
+      
+      return parseFloat(area.toFixed(2));
+    } catch (error) {
+      console.error("Erreur calcul surface:", error);
+      return 0;
+    }
   };
   
   // Fonction pour calculer les intersections
@@ -426,7 +449,7 @@ const Map2D = () => {
       let finalStyle;
       if (selectedParcelle?.id === parcelle.id) {
         finalStyle = selectionStyle;
-      } else if (!parcelle.fraud) {
+      } else if (!parcelle.fraud && !selectExcludeTypesFS.includes("ORTHO_PHOTO")) {
         finalStyle = fraudStyle; // Style pour les fraudes
       } else {
         finalStyle = uniStyle; // Style normal
@@ -459,7 +482,7 @@ const Map2D = () => {
       calculateIntersections();
     }, 100);*/
 
-  }, [parcelles, selectedParcelle, parcelleLayers]);
+  }, [parcelles, selectedParcelle, parcelleLayers, selectExcludeTypesFS]);
   
   useEffect(() => {
     setTimeout(() => {
@@ -477,19 +500,28 @@ const Map2D = () => {
           const latlngs = polygonCoords.map((ring: any) =>
             ring.map((coord: any) => [coord[1], coord[0]])
           );
+
+          // Calculer la surface en m² pour chaque polygone
+          const area = calculatePolygonArea(latlngs[0]);
+
           const instance = {
             ...plot,
             coordinates: latlngs,
-            type: "multipolygon" // Ajouter le type
+            type: "multipolygon",
+            area: area
           }
           importsPlots.push(instance);
         });
       } else if (geom.type.toLowerCase() === "polygon") {
         const latlngs = geom.coordinates.map((ring: any) => ring.map((coord: any) => [coord[1], coord[0]]));
+        
+        const area = calculatePolygonArea(latlngs[0]);
+
         const instance = {
           ...plot,
           coordinates: latlngs,
-          type: "polygon" // Ajouter le type
+          type: "polygon",
+          area: area
         }
         
         console.log("----------> INTEGRATE POLYGON");
@@ -1681,31 +1713,41 @@ const Map2D = () => {
           animate={{ opacity: 1, y: 0 }}
           className="absolute z-[1000] max-w-sm top-14 left-4"
         >
-          <Card className={`py-2 ${!selectedParcelle.fraud ? 'border-red-300 bg-red-50' : ''}`}>
+          <Card className={`py-2 ${(!selectedParcelle.fraud && !selectExcludeTypesFS.includes("ORTHO_PHOTO")) ? 'border-red-300 bg-red-50' : ''}`}>
             <CardContent className="p-4">
               <div className="flex items-start justify-between">
                 <div>
                   {/* AJOUTER L'ALERTE FRAUDE EN HAUT */}
-                  {!selectedParcelle.fraud && (
+                  {(!selectedParcelle.fraud && !selectExcludeTypesFS.includes("ORTHO_PHOTO")) && (
                     <div className="p-2 mb-3 text-sm font-bold text-center text-white bg-red-600 rounded-md">
                       ⚠️ BATIMENT FRAUDULEUX
                     </div>
                   )}
                   
-                  <h3 className={`text-lg font-bold ${!selectedParcelle.fraud ? 'text-red-700' : ''}`}>
+                  <h3 className={`text-lg font-bold ${(!selectedParcelle.fraud && !selectExcludeTypesFS.includes("ORTHO_PHOTO")) ? 'text-red-700' : ''}`}>
                     {selectedParcelle.code || "Non spécifié"}
                   </h3>
+                  
+                  {/* SURFACE CALCULÉE EN M² */}
                   <p className="pb-2 text-sm text-slate-600 dark:text-slate-400">
-                    SURFACE: {selectedParcelle.area} ha
+                    SURFACE: {selectedParcelle.area.toLocaleString()} m²
                   </p>
+                  
                   <p className="text-sm">Etat : {selectedParcelle?.state != null ? selectedParcelle?.state : "Non spécifié"}</p>
                   <p className="text-sm">Nombre de niveaux : {selectedParcelle?.nbLevels != null ? selectedParcelle?.nbLevels : "Non spécifié"}</p>
                   <p className="text-sm">Cité : {selectedParcelle?.plot?.housingEstate != null ? selectedParcelle?.plot?.housingEstate.name : "Aucune"}</p>
                   
                   {/* AJOUTER L'INDICATEUR FRAUDE DANS LES INFORMATIONS */}
-                  {!selectedParcelle.fraud && (
+                  {(!selectedParcelle.fraud && !selectExcludeTypesFS.includes("ORTHO_PHOTO")) && (
                     <div className="p-2 mt-2 text-sm font-medium text-red-800 bg-red-100 rounded">
                       <strong>Statut:</strong> Batiment frauduleux détecté
+                    </div>
+                  )}
+                  
+                  {/* AFFICHER LE TOTAL DES FRAUDES SI C'EST UNE FRAUDE */}
+                  {(!selectedParcelle.fraud && !selectExcludeTypesFS.includes("ORTHO_PHOTO")) && (
+                    <div className="p-2 mt-2 text-sm font-bold text-red-900 bg-red-200 rounded">
+                      <strong>Surface totale des fraudes:</strong> {totalFraudArea.toLocaleString()} m²
                     </div>
                   )}
                   

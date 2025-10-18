@@ -150,6 +150,9 @@ const buildingSlice = createSlice({
         setCurrentBuilding: (state, action: PayloadAction<Building | null>) => {
             state.currentBuilding = action.payload;
         },
+        clearCurrentBuilding: (state, action: PayloadAction<Building | null>) => {
+            state.currentBuilding = null;
+        },
         clearError: (state) => {
             state.error = null;
         },
@@ -273,7 +276,8 @@ export const {
     clearFilters,
     setCurrentBuilding,
     clearError,
-    setPagination
+    setPagination,
+    clearCurrentBuilding
 } = buildingSlice.actions;
 
 export default buildingSlice.reducer;
